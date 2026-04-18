@@ -1,0 +1,160 @@
+AI DOKUMANTASYONU
+=================
+
+1. ÖNEMLİ NOT
+-------------
+Bu projede backend doğrudan OpenAI, Gemini veya başka bir AI servisi çağırmaz.
+
+Doğru akış şudur:
+
+Mobil App / Frontend -> AI Servisi -> Backend
+
+Yani AI tarafı backend'in içinde değil, backend'in dışında çalışır.
+Backend sadece AI tarafından işlenmiş sonucu alır ve saklar.
+
+
+2. AI TARAFININ GÖREVİ
+----------------------
+AI veya dış değerlendirme servisi şu işleri yapabilir:
+
+- placement test değerlendirmesi
+- konuşma veya yazma performans skoru üretme
+- kullanıcı hatalarını analiz etme
+- correction önerileri oluşturma
+- ara değerlendirme verilerini hazırlama
+
+Backend bu hesaplamaları yapmaz.
+
+
+3. BACKEND'E GİDEN AI ODAKLI ENDPOINTLER
+----------------------------------------
+
+Bu projede ayrı bir /api/ai endpoint grubu yoktur.
+AI ile ilişkili veriler mevcut endpointlere gönderilir.
+
+
+4. PLACEMENT AI SONUCU
+----------------------
+
+Endpoint:
+- POST /api/users/level
+
+Amaç:
+- placement test veya AI değerlendirmesi sonrası çıkan level bilgisini backend'e kaydetmek
+
+Beklenen veri:
+- CurrentLevel
+
+Backend burada:
+- sadece level bilgisini saklar
+- leveli kendisi hesaplamaz
+
+
+5. SESSION PROGRESS İÇİN AI/ARA VERİ
+------------------------------------
+
+Endpoint:
+- PATCH /api/sessions/{id}/progress
+
+Amaç:
+- session devam ederken ara state bilgisini saklamak
+
+Bu alanda tutulabilecek örnek içerikler:
+- conversation history
+- user answers
+- ara AI değerlendirmeleri
+- geçici konuşma akışı
+
+Kurallar:
+- Geçerli JSON olmalı
+- Maksimum 10 KB olmalı
+- Session tamamlandıktan sonra bu endpoint kullanılamaz
+
+
+6. SESSION COMPLETE İÇİN AI SONUCU
+----------------------------------
+
+Endpoint:
+- POST /api/sessions/complete
+
+Amaç:
+- session bitince AI veya dış servis tarafından üretilen sonucu backend'e yazmak
+
+Beklenen veriler:
+- SessionId
+- Score
+- Mistakes listesi
+
+Mistakes alanında her kayıt şu bilgileri içerir:
+- ErrorType
+- WrongSentence
+- CorrectionText
+
+Backend burada:
+- score'u saklar
+- mistake kayıtlarını ekler
+- gerekiyorsa level progression kontrolü yapar
+
+
+7. AI TARAFI NELERİ BİLMELİ
+---------------------------
+
+AI tarafı şunları bilmelidir:
+
+- backend score hesaplamaz
+- backend correction üretmez
+- backend grammar analizi yapmaz
+- backend sadece gelen sonucu saklar
+
+Yani AI servisi kendi çıktısını backend'e uygun formata çevirmelidir.
+
+
+8. AI TARAFI İÇİN ÖRNEK AKIŞ
+----------------------------
+
+1. Frontend kullanıcıdan konuşma veya yazı verisini alır
+2. Bu veri AI servisine gider
+3. AI servisinden:
+   - score
+   - mistakes
+   - ara state json
+   gibi sonuçlar çıkar
+4. Frontend bu sonucu backend'e uygun endpointlere yollar
+
+
+9. AI ENTEGRASYONUNDA DİKKAT EDİLECEKLER
+----------------------------------------
+
+- Score 0 ile 100 arasında olmalı
+- Mistakes listesi doğru formatta olmalı
+- Progress json geçerli JSON olmalı
+- Session complete sırasında progress değil final sonuç gönderilmeli
+- Backend AI çıktısını yeniden kontrol edip hesaplama yapmaz
+
+
+10. GELECEKTE EKLENEBİLECEK AI ENDPOINTLERİ
+-------------------------------------------
+
+Şu an sistemde ayrı AI endpointleri yok.
+İleride istenirse şu tarz endpointler eklenebilir:
+
+- /api/ai/placement-result
+- /api/ai/session-evaluation
+- /api/ai/progress-sync
+
+Ancak mevcut projede buna ihtiyaç duyulmamıştır.
+
+
+11. ÖZET
+--------
+Bu projede AI backend'in içinde değildir.
+Backend ile AI arasındaki ilişki dolaylıdır.
+AI sonucu frontend veya harici servis üretir, backend ise bu sonucu:
+
+- level
+- score
+- mistake
+- progress
+
+olarak saklar.
+
