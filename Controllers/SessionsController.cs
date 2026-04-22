@@ -18,6 +18,10 @@ public sealed class SessionsController(ISessionService sessionService) : BaseApi
     public async Task<ActionResult<SessionDto>> Complete([FromBody] CompleteSessionRequestDto request, CancellationToken cancellationToken)
         => Ok(await sessionService.CompleteSessionAsync(GetUserId(), request, cancellationToken));
 
+    [HttpGet("{id:guid}/report")]
+    public async Task<ActionResult<SessionReportDto>> GetReport(Guid id, CancellationToken cancellationToken)
+        => Ok(await sessionService.GetReportAsync(GetUserId(), id, cancellationToken));
+
     [HttpPatch("{id:guid}/progress")]
     public async Task<ActionResult<SessionDto>> UpdateProgress(Guid id, [FromBody] UpdateSessionProgressRequestDto request, CancellationToken cancellationToken)
     {

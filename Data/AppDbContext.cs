@@ -49,6 +49,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Score).HasPrecision(5, 2);
             entity.Property(x => x.LastProgressJson).HasMaxLength(10240);
+            entity.Property(x => x.SummaryReport).HasMaxLength(4000);
             entity.HasOne(x => x.User).WithMany(x => x.Sessions).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.Scenario).WithMany(x => x.Sessions).HasForeignKey(x => x.ScenarioId).OnDelete(DeleteBehavior.Restrict);
         });

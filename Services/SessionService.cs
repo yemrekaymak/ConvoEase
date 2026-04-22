@@ -82,6 +82,7 @@ public sealed class SessionService(
             session.IsCompleted = true;
             session.Score = request.Score;
             session.LastProgressJson = null;
+            session.SummaryReport = NormalizeSummaryReport(request.SummaryReport);
             session.UpdatedAt = dateTimeProvider.UtcNow;
 
             var mistakes = request.Mistakes.Select(m => new UserMistake
@@ -134,9 +135,43 @@ public sealed class SessionService(
             Score = session.Score,
             IsCompleted = session.IsCompleted,
             LastProgressJson = session.LastProgressJson,
+            SummaryReport = session.SummaryReport,
             CreatedAt = session.CreatedAt,
             UpdatedAt = session.UpdatedAt
         };
+
+    public async Task<SessionReportDto> GetReportAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default)
+    {
+        var session = await userSessionRepository.GetByIdForUserAsync(sessionId, userId, cancellationToken)
+            ?? throw new NotFoundException("Session not found.");
+
+        return new SessionReportDto
+        {
+            SessionId = session.Id,
+            ScenarioId = session.ScenarioId,
+            ScenarioName = session.Scenario.Name,
+            InteractionType = session.InteractionType,
+            Score = session.Score,
+            SummaryReport = session.SummaryReport,
+            IsCompleted = session.IsCompleted,
+            CreatedAt = session.CreatedAt,
+            UpdatedAt = session.UpdatedAt,
+            Mistakes = session.Mistakes
+                .OrderBy(x => x.ErrorType)
+                .ThenBy(x => x.WrongSentence)
+                .Select(x => new MistakeDto
+                {
+                    Id = x.Id,
+                    SessionId = x.SessionId,
+                    ScenarioId = session.ScenarioId,
+                    ScenarioName = session.Scenario.Name,
+                    ErrorType = x.ErrorType,
+                    WrongSentence = x.WrongSentence,
+                    CorrectionText = x.CorrectionText
+                })
+                .ToList()
+        };
+    }
 
     private static void ValidateProgressJson(string? progressJson)
     {
@@ -158,6 +193,16 @@ public sealed class SessionService(
         {
             throw new BadRequestException("LastProgressJson must be valid JSON.");
         }
+    }
+
+    private static string? NormalizeSummaryReport(string? summaryReport)
+    {
+        if (string.IsNullOrWhiteSpace(summaryReport))
+        {
+            return null;
+        }
+
+        return summaryReport.Trim();
     }
 }
 

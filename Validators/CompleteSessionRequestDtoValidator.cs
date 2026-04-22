@@ -9,6 +9,7 @@ public sealed class CompleteSessionRequestDtoValidator : AbstractValidator<Compl
     {
         RuleFor(x => x.SessionId).NotEmpty();
         RuleFor(x => x.Score).InclusiveBetween(0, 100);
+        RuleFor(x => x.SummaryReport).MaximumLength(4000);
         RuleFor(x => x.Mistakes).NotNull();
         RuleForEach(x => x.Mistakes).SetValidator(new SessionMistakeInputDtoValidator());
     }
