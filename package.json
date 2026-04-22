@@ -1,0 +1,12 @@
+{
+  "name": "convoease",
+  "private": true,
+  "scripts": {
+    "start": "npm --prefix mobile start",
+    "tunnel": "npm --prefix mobile run tunnel",
+    "start:clear": "npm --prefix mobile run start:clear",
+    "android": "npm --prefix mobile run android",
+    "ios": "npm --prefix mobile run ios",
+    "web": "npm --prefix mobile run web"
+  }
+}
