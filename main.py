@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -18,6 +18,7 @@ from backend_istemci import (
 from oturum import Oturum
 from ajanlar.konusma_motoru import KonusmaMotoru
 from ajanlar.degerlendirici import Degerlendirici
+from groq_baglanti import sesi_metne_cevir
 
 load_dotenv()
 
@@ -61,6 +62,24 @@ class MesajIstek(BaseModel):
 
 class OturumBitirIstek(BaseModel):
     oturum_id: str
+
+
+class BackendOturumHazirlaIstek(BaseModel):
+    oturum_id: str
+    kullanici_id: str
+    seviye: str
+    senaryo: str
+    senaryo_id: int
+    interaction_type: str = "speaking"
+
+
+class BackendMesajIstek(BaseModel):
+    session_state_json: str
+    mesaj: str
+
+
+class BackendBitirIstek(BaseModel):
+    session_state_json: str
 
 
 def _backend_istemci_olustur(access_token: str | None) -> BackendIstemci:
@@ -229,3 +248,152 @@ def oturum_bitir(istek: OturumBitirIstek):
 @app.get("/saglik")
 def saglik_kontrolu():
     return {"durum": "calisiyor"}
+
+
+def _backend_seviye_adi(seviye: str) -> str:
+    backend_level = BACKEND_SEVIYE_ADLARI[CEFR_TO_BACKEND_LEVEL[seviye]]
+    return backend_level
+
+
+def _oturum_olustur(
+    oturum_id: str,
+    kullanici_id: str,
+    seviye: str,
+    senaryo: str,
+    senaryo_id: int,
+    interaction_type: str,
+) -> Oturum:
+    return Oturum(
+        oturum_id=oturum_id,
+        kullanici_id=kullanici_id,
+        backend_access_token="",
+        seviye=seviye,
+        backend_seviye=_backend_seviye_adi(seviye),
+        senaryo=senaryo,
+        senaryo_id=senaryo_id,
+        interaction_type=interaction_type,
+    )
+
+
+@app.post("/backend/oturum/hazirla")
+def backend_oturum_hazirla(istek: BackendOturumHazirlaIstek):
+    if istek.seviye not in GECERLI_SEVIYELER:
+        raise HTTPException(status_code=400, detail="Gecersiz seviye.")
+    if istek.senaryo not in GECERLI_SENARYOLAR:
+        raise HTTPException(status_code=400, detail="Gecersiz senaryo.")
+    if istek.interaction_type not in GECERLI_ETKILESIM_TURLERI:
+        raise HTTPException(status_code=400, detail="interaction_type speaking veya writing olmali.")
+
+    oturum = _oturum_olustur(
+        oturum_id=istek.oturum_id,
+        kullanici_id=istek.kullanici_id,
+        seviye=istek.seviye,
+        senaryo=istek.senaryo,
+        senaryo_id=istek.senaryo_id,
+        interaction_type=istek.interaction_type,
+    )
+
+    if istek.interaction_type == "writing":
+        ilk_mesaj = konusma_motoru.yazma_gorevi_baslat(istek.seviye, istek.senaryo)
+    else:
+        ilk_mesaj = konusma_motoru.konusmayi_baslat(istek.seviye, istek.senaryo)
+
+    oturum.karakter_cevabini_kaydet(ilk_mesaj)
+
+    return {
+        "characterMessage": ilk_mesaj,
+        "turn": oturum.tur_sayisi,
+        "sessionStateJson": oturum.durum_jsonu(),
+    }
+
+
+@app.post("/backend/mesaj")
+def backend_mesaj(istek: BackendMesajIstek):
+    oturum = Oturum.durumdan_yukle(istek.session_state_json)
+    oturum.kullanici_turu_isle(istek.mesaj)
+
+    karakter_cevabi = None
+    if oturum.interaction_type == "speaking":
+        karakter_cevabi = konusma_motoru.cevap_uret(
+            gecmis=oturum.konusma_gecmisi,
+            seviye=oturum.seviye,
+            senaryo=oturum.senaryo
+        )
+
+    degerlendirme = degerlendirici.anlik_degerlendir(
+        kullanici_mesaji=istek.mesaj,
+        seviye=oturum.seviye,
+        senaryo=oturum.senaryo,
+        tur_no=oturum.tur_sayisi,
+        interaction_type=oturum.interaction_type
+    )
+
+    if karakter_cevabi:
+        oturum.karakter_cevabini_kaydet(karakter_cevabi)
+
+    degerlendirme.setdefault("transcript", istek.mesaj)
+    oturum.degerlendirme_kaydet(degerlendirme)
+    errors = [
+        {
+            "type": str(hata.get("tur", "genel")),
+            "wrongSentence": str(hata.get("yanlis", "")).strip(),
+            "correctionText": str(hata.get("dogru", "")).strip(),
+            "whyWrong": str(hata.get("neden", "")).strip() or None,
+            "teachingTip": str(hata.get("ogretici_not", "")).strip() or None,
+        }
+        for hata in degerlendirme.get("hatalar", [])
+    ]
+
+    return {
+        "characterMessage": karakter_cevabi,
+        "evaluation": {
+            "turn": oturum.tur_sayisi,
+            "score": int(degerlendirme.get("puan", 0)),
+            "encouragement": degerlendirme.get("tesvik"),
+            "writingFeedback": degerlendirme.get("geri_bildirim"),
+            "errors": errors,
+        },
+        "turn": oturum.tur_sayisi,
+        "sessionStateJson": oturum.durum_jsonu(),
+        "progressJson": oturum.ilerleme_jsonu_hazirla(),
+        "transcript": istek.mesaj,
+    }
+
+
+@app.post("/backend/oturum/bitir")
+def backend_oturum_bitir(istek: BackendBitirIstek):
+    oturum = Oturum.durumdan_yukle(istek.session_state_json)
+    rapor = degerlendirici.oturum_raporu_olustur(
+        hata_logu=oturum.hata_logu,
+        seviye=oturum.seviye,
+        senaryo=oturum.senaryo,
+        toplam_tur=oturum.tur_sayisi,
+        interaction_type=oturum.interaction_type
+    )
+
+    return {
+        "sessionId": oturum.oturum_id,
+        "scenario": SCENARIO_SLUG_TO_NAME.get(oturum.senaryo, oturum.senaryo),
+        "interactionType": oturum.interaction_type,
+        "report": rapor,
+        "averageScore": oturum.ortalama_puan(),
+        "mistakes": oturum.backend_mistakes(),
+        "mistakeCount": len(oturum.backend_mistakes())
+    }
+
+
+@app.post("/backend/ses-metni")
+async def backend_ses_metni(dosya: UploadFile = File(...)):
+    if not dosya.filename:
+        raise HTTPException(status_code=400, detail="Ses dosyasi gerekli.")
+
+    icerik = await dosya.read()
+    if not icerik:
+        raise HTTPException(status_code=400, detail="Bos ses dosyasi.")
+
+    try:
+        transcript = sesi_metne_cevir(dosya.filename, icerik)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {"transcript": transcript}

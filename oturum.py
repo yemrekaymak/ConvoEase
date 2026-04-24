@@ -71,6 +71,8 @@ class Oturum:
                     "errorType": f"{kok}-{tur_baslik}",
                     "wrongSentence": str(hata.get("yanlis", "")).strip(),
                     "correctionText": str(hata.get("dogru", "")).strip(),
+                    "whyWrong": str(hata.get("neden", "")).strip() or None,
+                    "teachingTip": str(hata.get("ogretici_not", "")).strip() or None,
                 })
         return [
             hata for hata in sonuc
@@ -114,3 +116,42 @@ class Oturum:
             veri["importantTurns"].pop(0)
 
         return json.dumps(veri, ensure_ascii=False)
+
+    def durum_sozlugu(self) -> dict:
+        return {
+            "oturum_id": self.oturum_id,
+            "kullanici_id": self.kullanici_id,
+            "backend_access_token": self.backend_access_token,
+            "seviye": self.seviye,
+            "backend_seviye": self.backend_seviye,
+            "senaryo": self.senaryo,
+            "senaryo_id": self.senaryo_id,
+            "interaction_type": self.interaction_type,
+            "tur_sayisi": self.tur_sayisi,
+            "puan_listesi": self.puan_listesi,
+            "hata_logu": self.hata_logu,
+            "konusma_gecmisi": self.konusma_gecmisi,
+            "onemli_turlar": self.onemli_turlar,
+        }
+
+    def durum_jsonu(self) -> str:
+        return json.dumps(self.durum_sozlugu(), ensure_ascii=False)
+
+    @classmethod
+    def durumdan_yukle(cls, veri: dict | str):
+        kaynak = json.loads(veri) if isinstance(veri, str) else veri
+        return cls(
+            oturum_id=str(kaynak["oturum_id"]),
+            kullanici_id=str(kaynak.get("kullanici_id", "")),
+            backend_access_token=str(kaynak.get("backend_access_token", "")),
+            seviye=str(kaynak["seviye"]),
+            backend_seviye=str(kaynak.get("backend_seviye", "")),
+            senaryo=str(kaynak["senaryo"]),
+            senaryo_id=int(kaynak["senaryo_id"]),
+            interaction_type=str(kaynak["interaction_type"]),
+            tur_sayisi=int(kaynak.get("tur_sayisi", 0)),
+            puan_listesi=list(kaynak.get("puan_listesi", [])),
+            hata_logu=list(kaynak.get("hata_logu", [])),
+            konusma_gecmisi=list(kaynak.get("konusma_gecmisi", [])),
+            onemli_turlar=list(kaynak.get("onemli_turlar", [])),
+        )

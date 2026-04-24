@@ -6,6 +6,7 @@ load_dotenv()
 
 # llama 3.3 70b: hizli ve yeterince guclu, konusma icin ideal
 MODEL = "llama-3.3-70b-versatile"
+TRANSCRIPTION_MODEL = "whisper-large-v3-turbo"
 _istemci = None
 
 
@@ -32,3 +33,15 @@ def ai_yanit_al(sistem_promptu: str, mesajlar: list, max_token: int = 1024) -> s
         ]
     )
     return yanit.choices[0].message.content.strip()
+
+
+def sesi_metne_cevir(dosya_adi: str, ses_bytes: bytes, dil: str = "en") -> str:
+    yanit = _istemci_al().audio.transcriptions.create(
+        file=(dosya_adi, ses_bytes),
+        model=TRANSCRIPTION_MODEL,
+        language=dil
+    )
+    metin = getattr(yanit, "text", None)
+    if not metin:
+        raise RuntimeError("Ses metne cevrilemedi.")
+    return metin.strip()

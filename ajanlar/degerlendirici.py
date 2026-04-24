@@ -55,6 +55,17 @@ def _sonucu_dogrula(veri: dict, tur_no: int) -> dict:
     hatalar = veri.get("hatalar", [])
     if not isinstance(hatalar, list):
         hatalar = []
+    duzeltilmis_hatalar = []
+    for hata in hatalar:
+        if not isinstance(hata, dict):
+            continue
+        duzeltilmis_hatalar.append({
+            "tur": str(hata.get("tur", "genel")),
+            "yanlis": str(hata.get("yanlis", "")).strip(),
+            "dogru": str(hata.get("dogru", "")).strip(),
+            "neden": str(hata.get("neden", "")).strip(),
+            "ogretici_not": str(hata.get("ogretici_not", "")).strip(),
+        })
 
     tesvik = veri.get("tesvik", "Devam et, iyi gidiyorsun.")
     if not isinstance(tesvik, str) or not tesvik.strip():
@@ -64,7 +75,7 @@ def _sonucu_dogrula(veri: dict, tur_no: int) -> dict:
         "tur": tur_no,
         "puan": puan,
         "dagilim": dagilim,
-        "hatalar": hatalar,
+        "hatalar": duzeltilmis_hatalar,
         "tesvik": tesvik
     }
 
