@@ -1,0 +1,127 @@
+FRONTEND DOKUMANTASYONU
+=======================
+
+1. AMAÇ
+-------
+Bu doküman frontend tarafında backend ile hangi sırada haberleşileceğini ve hangi endpointlerin hangi ekranda kullanılacağını açıklar.
+
+
+2. GENEL AKIŞ
+-------------
+Kullanıcı uygulamayı kullanırken tipik akış şu şekildedir:
+
+1. Kayıt olur veya giriş yapar
+2. Placement test sorularını görür
+3. Placement test sonucu backend'e kaydedilir
+4. Seviyesine uygun senaryolar listelenir
+5. Kullanıcı bir session başlatır
+6. Session sırasında progress kaydı yapılabilir
+7. Session tamamlanınca skor ve mistakes backend'e gönderilir
+8. Kullanıcı geçmiş hatalarını görebilir
+
+
+3. AUTH EKRANLARI
+-----------------
+
+Kayıt:
+- POST /api/auth/register
+
+Giriş:
+- POST /api/auth/login
+
+Token yenileme:
+- POST /api/auth/refresh
+
+Çıkış:
+- POST /api/auth/logout
+
+Not:
+Login sonrası access token frontend tarafında saklanmalı ve protected endpointlerde Bearer token olarak gönderilmelidir.
+
+
+4. PLACEMENT TEST AKIŞI
+-----------------------
+
+Soruları çekmek için:
+- GET /api/questions
+
+AI veya placement değerlendirmesi sonrası seviye kaydetmek için:
+- POST /api/users/level
+
+Frontend burada:
+- soruları kullanıcıya gösterir
+- cevapları AI veya dış servis tarafında değerlendirir
+- çıkan level bilgisini backend'e gönderir
+
+
+5. SENARYO EKRANI
+-----------------
+
+Kullanıcının erişebileceği senaryoları almak için:
+- GET /api/scenarios/allowed
+
+Backend burada kullanıcı seviyesine göre uygun senaryoları döner.
+
+
+6. SESSION AKIŞI
+----------------
+
+Yeni session başlatmak için:
+- POST /api/sessions
+
+Session sırasında ilerleme kaydetmek için:
+- PATCH /api/sessions/{id}/progress
+
+Session tamamlamak için:
+- POST /api/sessions/complete
+
+Frontend burada:
+- session id bilgisini saklamalı
+- devam eden konuşmayı veya yazmayı progress olarak kaydedebilmeli
+- tamamlanınca skor ve mistakes listesini backend'e göndermeli
+
+
+7. MISTAKES EKRANI
+------------------
+
+Kullanıcının hata geçmişini çekmek için:
+- GET /api/mistakes?scenarioId=&page=&pageSize=
+
+Kullanım:
+- tüm hataları listelemek için scenarioId gönderilmez
+- belirli senaryoya göre filtrelemek için scenarioId gönderilir
+
+
+8. FRONTEND TARAFINDA DİKKAT EDİLECEKLER
+----------------------------------------
+
+- Access token süresi dolabilir
+- 401 alınırsa refresh akışı çalıştırılmalıdır
+- Progress json geçerli JSON formatında gönderilmelidir
+- Session complete sırasında score ve mistakes eksiksiz gönderilmelidir
+- Kullanıcı seviyesine göre gelen senaryolar dışında seçim yapılmamalıdır
+
+
+9. FRONTEND İÇİN ÖNERİLEN TEST SIRASI
+-------------------------------------
+
+1. Register
+2. Login
+3. Questions
+4. Users/level
+5. Scenarios/allowed
+6. Sessions create
+7. Sessions progress
+8. Sessions complete
+9. Mistakes list
+
+
+10. ÖZET
+--------
+Frontend için backend tarafında gerekli temel akışlar hazırdır.
+Frontend'in görevi:
+- kullanıcı arayüzünü yönetmek
+- token saklamak
+- doğru endpoint sırasını takip etmek
+- AI sonucu oluşan veriyi backend'e uygun formatta göndermektir
+

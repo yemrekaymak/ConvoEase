@@ -14,13 +14,14 @@ import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../auth/AuthContext';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
-export function LoginScreen({ navigation }: Props) {
-  const { login, apiBaseUrl, setApiBaseUrl } = useAuth();
+export function RegisterScreen({ navigation }: Props) {
+  const { register } = useAuth();
+  const [firstName, setFirstName] = useState('Berdan');
+  const [lastName, setLastName] = useState('User');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [baseUrl, setBaseUrl] = useState(apiBaseUrl);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,27 +36,22 @@ export function LoginScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
         >
-          <Text style={styles.logo}>ConvoEase</Text>
-          <Text style={styles.tagline}>
-            Backend ile entegre (JWT + refresh). Önce API URL’yi kontrol et, sonra giriş yap.
-          </Text>
+          <Text style={styles.logo}>Kayıt</Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
+
           <TextInput
             style={styles.input}
-            placeholder="API Base URL (örn: http://192.168.1.160:5136)"
+            placeholder="Ad"
             placeholderTextColor={colors.textSecondary}
-            value={baseUrl}
-            onChangeText={setBaseUrl}
-            autoCapitalize="none"
+            value={firstName}
+            onChangeText={setFirstName}
           />
-          <PrimaryButton
-            title="API URL kaydet"
-            variant="outline"
-            onPress={async () => {
-              setError(null);
-              await setApiBaseUrl(baseUrl);
-            }}
-            style={styles.smallButton}
+          <TextInput
+            style={styles.input}
+            placeholder="Soyad"
+            placeholderTextColor={colors.textSecondary}
+            value={lastName}
+            onChangeText={setLastName}
           />
           <TextInput
             style={styles.input}
@@ -68,33 +64,35 @@ export function LoginScreen({ navigation }: Props) {
           />
           <TextInput
             style={styles.input}
-            placeholder="Şifre"
+            placeholder="Şifre (min 8, A/a/0)"
             placeholderTextColor={colors.textSecondary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
           />
+
           <PrimaryButton
-            title={busy ? '...' : 'Giriş yap'}
+            title={busy ? '...' : 'Hesap oluştur'}
             disabled={busy}
             onPress={async () => {
               setBusy(true);
               setError(null);
               try {
-                await login({ email, password });
+                await register({ firstName, lastName, email, password });
                 navigation.reset({ index: 0, routes: [{ name: 'Placement' }] });
               } catch (e: any) {
-                setError(e?.message ?? 'Giriş başarısız');
+                setError(e?.message ?? 'Kayıt başarısız');
               } finally {
                 setBusy(false);
               }
             }}
             style={styles.button}
           />
+
           <PrimaryButton
-            title="Hesabın yok mu? Kayıt ol"
+            title="Geri dön"
             variant="outline"
-            onPress={() => navigation.navigate('Register')}
+            onPress={() => navigation.goBack()}
             style={styles.secondary}
           />
         </ScrollView>
@@ -113,13 +111,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     justifyContent: 'center',
   },
-  logo: { fontSize: 32, fontWeight: '800', color: colors.primary, marginBottom: 8 },
-  tagline: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    lineHeight: 22,
-    marginBottom: 32,
-  },
+  logo: { fontSize: 28, fontWeight: '800', color: colors.text, marginBottom: 8 },
   input: {
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -131,8 +123,8 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 12,
   },
-  smallButton: { marginBottom: 14, paddingVertical: 10 },
   button: { marginTop: 8 },
   secondary: { marginTop: 10 },
   error: { color: '#9B1C1C', marginBottom: 12 },
 });
+

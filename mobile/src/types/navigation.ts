@@ -1,16 +1,16 @@
-import type { Difficulty, ScenarioId } from '../constants/scenarios';
-
 export type RootStackParamList = {
   Login: undefined;
+  Register: undefined;
+  Placement: undefined;
   Home: undefined;
   Chat: {
-    scenarioId: ScenarioId;
+    scenarioId: number;
     scenarioTitle: string;
-    difficulty: Difficulty;
     difficultyLabel: string;
   };
   Summary: {
     scenarioTitle: string;
     difficultyLabel: string;
   };
+  Mistakes: undefined;
 };

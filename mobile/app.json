@@ -15,7 +15,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.convoease.app"
+      "bundleIdentifier": "com.convoease.app",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -23,11 +28,15 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": false,
+      "usesCleartextTraffic": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.convoease.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

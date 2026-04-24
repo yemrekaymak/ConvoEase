@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -11,11 +11,19 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Audio } from 'expo-av';
 import { FeedbackPanel } from '../components/FeedbackPanel';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ToastBanner } from '../components/ToastBanner';
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../types/navigation';
+import { apiRequest } from '../api/client';
+import type {
+  CompleteSessionRequestDto,
+  InteractionType,
+  SessionDto,
+  UpdateSessionProgressRequestDto,
+} from '../api/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
@@ -34,30 +42,151 @@ export function ChatScreen({ navigation, route }: Props) {
   const [messages, setMessages] = useState<Msg[]>(MOCK_THREAD);
   const [loading, setLoading] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
+  const [session, setSession] = useState<SessionDto | null>(null);
+  const [interactionType] = useState<InteractionType>(2); // Writing
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
 
   const hideToast = useCallback(() => setToastVisible(false), []);
 
-  const sendMock = () => {
+  useEffect(() => {
+    return () => {
+      void (async () => {
+        try {
+          const rec = recordingRef.current;
+          if (rec) {
+            await rec.stopAndUnloadAsync();
+          }
+        } catch {
+          // ignore
+        } finally {
+          recordingRef.current = null;
+        }
+      })();
+    };
+  }, []);
+
+  const sendMock = async () => {
     const t = input.trim();
     if (!t) return;
     setLoading(true);
     setInput('');
-    setMessages((prev) => [...prev, { id: String(Date.now()), role: 'user', text: t }]);
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: String(Date.now() + 1),
-          role: 'bot',
-          text: '(Mock) Backend bağlanınca gerçek yanıt gelecek.',
-        },
-      ]);
+    const userMsg: Msg = { id: String(Date.now()), role: 'user', text: t };
+    const botMsg: Msg = {
+      id: String(Date.now() + 1),
+      role: 'bot',
+      text: '(Mock) Backend bağlanınca gerçek yanıt gelecek.',
+    };
+    const next = [...messages, userMsg, botMsg];
+    setMessages(next);
+    try {
+      await saveProgress(next);
+    } catch {
+      // ignore progress failures in mock mode
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
+  const ensureSession = useCallback(async () => {
+    if (session) return session;
+    const created = await apiRequest<SessionDto>('/api/sessions', {
+      method: 'POST',
+      body: { scenarioId: route.params.scenarioId, interactionType },
+    });
+    setSession(created);
+    return created;
+  }, [session, route.params.scenarioId, interactionType]);
+
+  const saveProgress = useCallback(
+    async (nextMessages: Msg[]) => {
+      const s = await ensureSession();
+      const payload = {
+        scenarioId: s.scenarioId,
+        interactionType: s.interactionType,
+        messages: nextMessages.slice(-20), // keep small for 10KB
+      };
+      const json = JSON.stringify(payload);
+      const req: UpdateSessionProgressRequestDto = { lastProgressJson: json };
+      await apiRequest<SessionDto>(`/api/sessions/${s.id}/progress`, {
+        method: 'PATCH',
+        body: req,
+      });
+    },
+    [ensureSession]
+  );
+
+  const toggleRecording = useCallback(async () => {
+    setMicError(null);
+    if (isRecording) {
+      try {
+        const rec = recordingRef.current;
+        if (!rec) {
+          setIsRecording(false);
+          return;
+        }
+        await rec.stopAndUnloadAsync();
+        const status = await rec.getStatusAsync();
+        const uri = rec.getURI();
+        recordingRef.current = null;
+        setIsRecording(false);
+
+        const seconds =
+          typeof (status as any)?.durationMillis === 'number'
+            ? Math.max(1, Math.round((status as any).durationMillis / 1000))
+            : 1;
+
+        // Backend STT yok; şimdilik ses kaydı tamamlandı bilgisini mesaj olarak ekliyoruz.
+        const next: Msg[] = [
+          ...messages,
+          { id: String(Date.now()), role: 'user', text: `🎤 Voice message (${seconds}s)` },
+          {
+            id: String(Date.now() + 1),
+            role: 'bot',
+            text: uri
+              ? '(Mock) Ses kaydı alındı. STT/AI gelince metne çevireceğiz.'
+              : '(Mock) Ses kaydı alındı.',
+          },
+        ];
+        setMessages(next);
+        try {
+          await saveProgress(next);
+        } catch {
+          // ignore
+        }
+      } catch (e: any) {
+        setMicError(e?.message ?? 'Kayıt durdurulamadı');
+        setIsRecording(false);
+      }
+      return;
+    }
+
+    try {
+      const perm = await Audio.requestPermissionsAsync();
+      if (!perm.granted) {
+        setMicError('Mikrofon izni gerekli.');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const rec = new Audio.Recording();
+      await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await rec.startAsync();
+      recordingRef.current = rec;
+      setIsRecording(true);
+    } catch (e: any) {
+      setMicError(e?.message ?? 'Mikrofon başlatılamadı');
+      setIsRecording(false);
+    }
+  }, [isRecording, messages, saveProgress]);
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
           <Text style={styles.back}>‹ Geri</Text>
@@ -78,16 +207,19 @@ export function ChatScreen({ navigation, route }: Props) {
       />
 
       <FeedbackPanel message="İpucu: “I’d like…” nazik sipariş için uygundur. (Statik örnek)" />
+      {micError ? <Text style={styles.micError}>{micError}</Text> : null}
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
         <FlatList
           data={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
           renderItem={({ item }) => (
             <View
               style={[
@@ -115,8 +247,12 @@ export function ChatScreen({ navigation, route }: Props) {
         />
 
         <View style={styles.composer}>
-          <Pressable style={styles.mic} hitSlop={8}>
-            <Text style={styles.micText}>🎤</Text>
+          <Pressable
+            style={[styles.mic, isRecording && styles.micActive]}
+            hitSlop={8}
+            onPress={toggleRecording}
+          >
+            <Text style={styles.micText}>{isRecording ? '⏺' : '🎤'}</Text>
           </Pressable>
           <TextInput
             style={styles.input}
@@ -139,9 +275,25 @@ export function ChatScreen({ navigation, route }: Props) {
           <PrimaryButton
             title="Oturumu bitir"
             variant="outline"
-            onPress={() =>
-              navigation.navigate('Summary', { scenarioTitle, difficultyLabel })
-            }
+            onPress={async () => {
+              setLoading(true);
+              try {
+                const s = await ensureSession();
+                const req: CompleteSessionRequestDto = {
+                  sessionId: s.id,
+                  score: 0,
+                  summaryReport: 'Demo summary (AI/harici servis sonra eklenecek).',
+                  mistakes: [],
+                };
+                await apiRequest<SessionDto>('/api/sessions/complete', {
+                  method: 'POST',
+                  body: req,
+                });
+              } finally {
+                setLoading(false);
+              }
+              navigation.navigate('Summary', { scenarioTitle, difficultyLabel });
+            }}
           />
         </View>
       </KeyboardAvoidingView>
@@ -172,7 +324,7 @@ const styles = StyleSheet.create({
     width: 72,
     textAlign: 'right',
   },
-  list: { padding: 16, paddingBottom: 8 },
+  list: { padding: 16, paddingBottom: 16 },
   bubbleWrap: { marginBottom: 10, maxWidth: '88%' },
   bubbleWrapUser: { alignSelf: 'flex-end' },
   bubbleWrapBot: { alignSelf: 'flex-start' },
@@ -191,7 +343,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingTop: 10,
+    paddingBottom: 10,
     gap: 8,
     backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -205,6 +358,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
+  },
+  micActive: {
+    backgroundColor: '#FFE1E1',
   },
   micText: { fontSize: 20 },
   input: {
@@ -231,4 +387,5 @@ const styles = StyleSheet.create({
   sendDisabled: { opacity: 0.4 },
   sendText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   footer: { paddingHorizontal: 16, paddingTop: 4, backgroundColor: colors.surface },
+  micError: { marginHorizontal: 16, marginBottom: 8, color: '#9B1C1C' },
 });
