@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\yunus\\OneDrive\\Masaüstü\\ConvoEasee\\backend_ConvoEase\\Backend.csproj": {}
+    "C:\\Users\\yunus\\OneDrive\\Masaüstü\\All_ConvoEase\\backend_ConvoEase\\Backend.csproj": {}
   },
   "projects": {
-    "C:\\Users\\yunus\\OneDrive\\Masaüstü\\ConvoEasee\\backend_ConvoEase\\Backend.csproj": {
+    "C:\\Users\\yunus\\OneDrive\\Masaüstü\\All_ConvoEase\\backend_ConvoEase\\Backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\yunus\\OneDrive\\Masaüstü\\ConvoEasee\\backend_ConvoEase\\Backend.csproj",
+        "projectUniqueName": "C:\\Users\\yunus\\OneDrive\\Masaüstü\\All_ConvoEase\\backend_ConvoEase\\Backend.csproj",
         "projectName": "Backend",
-        "projectPath": "C:\\Users\\yunus\\OneDrive\\Masaüstü\\ConvoEasee\\backend_ConvoEase\\Backend.csproj",
+        "projectPath": "C:\\Users\\yunus\\OneDrive\\Masaüstü\\All_ConvoEase\\backend_ConvoEase\\Backend.csproj",
         "packagesPath": "C:\\Users\\yunus\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\yunus\\OneDrive\\Masaüstü\\ConvoEasee\\backend_ConvoEase\\obj\\",
+        "outputPath": "C:\\Users\\yunus\\OneDrive\\Masaüstü\\All_ConvoEase\\backend_ConvoEase\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\yunus\\OneDrive\\Masaüstü\\ConvoEasee\\backend_ConvoEase\\NuGet.Config",
+          "C:\\Users\\yunus\\OneDrive\\Masaüstü\\All_ConvoEase\\backend_ConvoEase\\NuGet.Config",
           "C:\\Users\\yunus\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"

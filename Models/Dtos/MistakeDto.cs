@@ -9,6 +9,8 @@ public sealed class MistakeDto
     public required string ErrorType { get; init; }
     public required string WrongSentence { get; init; }
     public required string CorrectionText { get; init; }
+    public string? WhyWrong { get; init; }
+    public string? TeachingTip { get; init; }
 }
 
 

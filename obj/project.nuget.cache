@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "zbtmfRdcvp8=",
+  "dgSpecHash": "R0B4XEztyYw=",
   "success": true,
-  "projectFilePath": "C:\\Users\\yunus\\OneDrive\\Masaüstü\\ConvoEasee\\backend_ConvoEase\\Backend.csproj",
+  "projectFilePath": "C:\\Users\\yunus\\OneDrive\\Masaüstü\\All_ConvoEase\\backend_ConvoEase\\Backend.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\yunus\\.nuget\\packages\\fluentvalidation\\11.11.0\\fluentvalidation.11.11.0.nupkg.sha512",
     "C:\\Users\\yunus\\.nuget\\packages\\fluentvalidation.aspnetcore\\11.3.0\\fluentvalidation.aspnetcore.11.3.0.nupkg.sha512",

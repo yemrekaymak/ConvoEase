@@ -15,7 +15,7 @@ public sealed class SessionService(
     IUnitOfWork unitOfWork,
     IDateTimeProvider dateTimeProvider) : ISessionService
 {
-    private const int MaxProgressBytes = 10 * 1024;
+    private const int MaxProgressBytes = 128 * 1024;
 
     public async Task<SessionDto> CreateSessionAsync(Guid userId, CreateSessionRequestDto request, CancellationToken cancellationToken = default)
     {
@@ -91,7 +91,9 @@ public sealed class SessionService(
                 SessionId = session.Id,
                 ErrorType = m.ErrorType.Trim(),
                 WrongSentence = m.WrongSentence.Trim(),
-                CorrectionText = m.CorrectionText.Trim()
+                CorrectionText = m.CorrectionText.Trim(),
+                WhyWrong = NormalizeOptionalText(m.WhyWrong),
+                TeachingTip = NormalizeOptionalText(m.TeachingTip)
             }).ToList();
 
             if (mistakes.Count > 0)
@@ -167,7 +169,9 @@ public sealed class SessionService(
                     ScenarioName = session.Scenario.Name,
                     ErrorType = x.ErrorType,
                     WrongSentence = x.WrongSentence,
-                    CorrectionText = x.CorrectionText
+                    CorrectionText = x.CorrectionText,
+                    WhyWrong = x.WhyWrong,
+                    TeachingTip = x.TeachingTip
                 })
                 .ToList()
         };
@@ -182,7 +186,7 @@ public sealed class SessionService(
 
         if (Encoding.UTF8.GetByteCount(progressJson) > MaxProgressBytes)
         {
-            throw new BadRequestException("LastProgressJson cannot exceed 10KB.");
+            throw new BadRequestException("LastProgressJson cannot exceed 128KB.");
         }
 
         try
@@ -203,6 +207,16 @@ public sealed class SessionService(
         }
 
         return summaryReport.Trim();
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim();
     }
 }
 

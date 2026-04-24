@@ -13,6 +13,8 @@ public sealed class SessionMistakeInputDto
     public string ErrorType { get; init; } = string.Empty;
     public string WrongSentence { get; init; } = string.Empty;
     public string CorrectionText { get; init; } = string.Empty;
+    public string? WhyWrong { get; init; }
+    public string? TeachingTip { get; init; }
 }
 
 

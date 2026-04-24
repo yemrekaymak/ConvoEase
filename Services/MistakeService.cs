@@ -19,7 +19,9 @@ public sealed class MistakeService(IUserMistakeRepository userMistakeRepository)
                 ScenarioName = m.Session.Scenario.Name,
                 ErrorType = m.ErrorType,
                 WrongSentence = m.WrongSentence,
-                CorrectionText = m.CorrectionText
+                CorrectionText = m.CorrectionText,
+                WhyWrong = m.WhyWrong,
+                TeachingTip = m.TeachingTip
             }).ToList(),
             Page = page,
             PageSize = pageSize,

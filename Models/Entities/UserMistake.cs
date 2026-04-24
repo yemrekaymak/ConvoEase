@@ -7,6 +7,8 @@ public sealed class UserMistake
     public string ErrorType { get; set; } = string.Empty;
     public string WrongSentence { get; set; } = string.Empty;
     public string CorrectionText { get; set; } = string.Empty;
+    public string? WhyWrong { get; set; }
+    public string? TeachingTip { get; set; }
     public UserSession Session { get; set; } = null!;
 }
 

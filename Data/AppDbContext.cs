@@ -48,8 +48,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Score).HasPrecision(5, 2);
-            entity.Property(x => x.LastProgressJson).HasMaxLength(10240);
-            entity.Property(x => x.SummaryReport).HasMaxLength(4000);
+            entity.Property(x => x.LastProgressJson).HasMaxLength(131072);
+            entity.Property(x => x.SummaryReport).HasMaxLength(12000);
             entity.HasOne(x => x.User).WithMany(x => x.Sessions).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.Scenario).WithMany(x => x.Sessions).HasForeignKey(x => x.ScenarioId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -60,6 +60,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.ErrorType).IsRequired().HasMaxLength(100);
             entity.Property(x => x.WrongSentence).IsRequired().HasMaxLength(1000);
             entity.Property(x => x.CorrectionText).IsRequired().HasMaxLength(1000);
+            entity.Property(x => x.WhyWrong).HasMaxLength(2000);
+            entity.Property(x => x.TeachingTip).HasMaxLength(2000);
             entity.HasOne(x => x.Session).WithMany(x => x.Mistakes).HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -12,6 +12,10 @@ public sealed class QuestionsController(IQuestionService questionService) : Base
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<QuestionDto>>> Get(CancellationToken cancellationToken)
         => Ok(await questionService.GetQuestionsAsync(cancellationToken));
+
+    [HttpPost("submit")]
+    public async Task<ActionResult<PlacementTestResultDto>> Submit([FromBody] SubmitPlacementTestRequestDto request, CancellationToken cancellationToken)
+        => Ok(await questionService.SubmitPlacementTestAsync(GetUserId(), request, cancellationToken));
 }
 
 

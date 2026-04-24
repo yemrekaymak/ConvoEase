@@ -19,6 +19,14 @@ public sealed class UserSessionRepository(AppDbContext dbContext) : IUserSession
             .Include(x => x.Mistakes)
             .FirstOrDefaultAsync(x => x.Id == sessionId && x.UserId == userId, cancellationToken);
 
+    public Task<UserSession?> GetLatestIncompleteForUserAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        dbContext.UserSessions
+            .Include(x => x.Scenario)
+            .Include(x => x.Mistakes)
+            .Where(x => x.UserId == userId && !x.IsCompleted)
+            .OrderByDescending(x => x.UpdatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<bool> HasCompletedAllScenariosForLevelAsync(Guid userId, LanguageLevel level, IEnumerable<int> scenarioIds, CancellationToken cancellationToken = default)
     {
         var completedScenarioIds = await dbContext.UserSessions
@@ -37,6 +45,13 @@ public sealed class UserSessionRepository(AppDbContext dbContext) : IUserSession
             return;
         }
 
+        await EnsureColumnExistsAsync("UserSessions", "SummaryReport", "ALTER TABLE UserSessions ADD COLUMN SummaryReport TEXT NULL;", cancellationToken);
+        await EnsureColumnExistsAsync("UserMistakes", "WhyWrong", "ALTER TABLE UserMistakes ADD COLUMN WhyWrong TEXT NULL;", cancellationToken);
+        await EnsureColumnExistsAsync("UserMistakes", "TeachingTip", "ALTER TABLE UserMistakes ADD COLUMN TeachingTip TEXT NULL;", cancellationToken);
+    }
+
+    private async Task EnsureColumnExistsAsync(string tableName, string columnName, string alterSql, CancellationToken cancellationToken)
+    {
         var connection = dbContext.Database.GetDbConnection();
         var shouldClose = connection.State != ConnectionState.Open;
         if (shouldClose)
@@ -47,7 +62,7 @@ public sealed class UserSessionRepository(AppDbContext dbContext) : IUserSession
         try
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('UserSessions') WHERE name = 'SummaryReport';";
+            command.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{tableName}') WHERE name = '{columnName}';";
 
             var result = await command.ExecuteScalarAsync(cancellationToken);
             if (result is long columnCount && columnCount > 0)
@@ -63,12 +78,7 @@ public sealed class UserSessionRepository(AppDbContext dbContext) : IUserSession
             }
         }
 
-        await dbContext.Database.ExecuteSqlRawAsync(
-            """
-            ALTER TABLE UserSessions
-            ADD COLUMN SummaryReport TEXT NULL;
-            """,
-            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(alterSql, cancellationToken);
     }
 }
 
