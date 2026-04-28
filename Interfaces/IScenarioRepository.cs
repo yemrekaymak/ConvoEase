@@ -5,6 +5,7 @@ namespace Backend.Interfaces;
 
 public interface IScenarioRepository
 {
+    Task<IReadOnlyList<Scenario>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Scenario>> GetAllowedAsync(LanguageLevel level, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Scenario>> GetByLevelAsync(LanguageLevel level, CancellationToken cancellationToken = default);
     Task<Scenario?> GetByIdAsync(int id, CancellationToken cancellationToken = default);

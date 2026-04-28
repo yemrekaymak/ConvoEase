@@ -41,7 +41,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<Scenario>(entity =>
         {
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.GroupKey).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.GroupName).IsRequired().HasMaxLength(200);
             entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.PromptKey).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.OrderIndex).IsRequired();
         });
 
         modelBuilder.Entity<UserSession>(entity =>

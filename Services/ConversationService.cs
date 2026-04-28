@@ -45,7 +45,7 @@ public sealed class ConversationService(
             oturum_id = session.Id,
             kullanici_id = user.Id,
             seviye = ToCefrLevel(user.CurrentLevel.Value),
-            senaryo = ToScenarioSlug(scenario.Name),
+            senaryo = scenario.PromptKey,
             senaryo_id = scenario.Id,
             interaction_type = request.InteractionType == InteractionType.Speaking ? "speaking" : "writing"
         };
@@ -174,17 +174,42 @@ public sealed class ConversationService(
 
     private async Task<T> PostJsonAsync<T>(string path, object payload, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync(
-            $"{_aiBaseUrl}{path}",
-            new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json"),
-            cancellationToken);
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.PostAsync(
+                $"{_aiBaseUrl}{path}",
+                new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json"),
+                cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            throw new BadRequestException("AI service is unavailable.");
+        }
+        catch (TaskCanceledException)
+        {
+            throw new BadRequestException("AI service timed out.");
+        }
 
         return await ReadResponseAsync<T>(response, cancellationToken);
     }
 
     private async Task<T> PostMultipartAsync<T>(string path, MultipartFormDataContent content, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.PostAsync($"{_aiBaseUrl}{path}", content, cancellationToken);
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.PostAsync($"{_aiBaseUrl}{path}", content, cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            throw new BadRequestException("AI service is unavailable.");
+        }
+        catch (TaskCanceledException)
+        {
+            throw new BadRequestException("AI service timed out.");
+        }
+
         return await ReadResponseAsync<T>(response, cancellationToken);
     }
 
@@ -230,17 +255,6 @@ public sealed class ConversationService(
                 WhyWrong = x.WhyWrong,
                 TeachingTip = x.TeachingTip
             }).ToList()
-        };
-
-    private static string ToScenarioSlug(string scenarioName) =>
-        scenarioName switch
-        {
-            "Cafe Conversation" => "kafe",
-            "Hospital Visit" => "hastane",
-            "Shopping" => "alisveris",
-            "Hotel Check-in" => "otel",
-            "Job Interview" => "is_gorusmesi",
-            _ => throw new BadRequestException("Scenario mapping not found.")
         };
 
     private static string ToCefrLevel(LanguageLevel level) =>

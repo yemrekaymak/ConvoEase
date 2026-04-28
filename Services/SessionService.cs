@@ -25,9 +25,18 @@ public sealed class SessionService(
         var scenario = await scenarioRepository.GetByIdAsync(request.ScenarioId, cancellationToken)
             ?? throw new NotFoundException("Scenario not found.");
 
-        if (user.CurrentLevel is null || scenario.DifficultyLevel > user.CurrentLevel.Value)
+        if (user.CurrentLevel is null)
         {
             throw new BadRequestException("Scenario is not available for the current user level.");
+        }
+
+        var allScenarios = await scenarioRepository.GetAllAsync(cancellationToken);
+        var completedScenarioIds = await userSessionRepository.GetCompletedScenarioIdsAsync(userId, cancellationToken);
+        var accessMap = ScenarioUnlockRules.Evaluate(allScenarios, user.CurrentLevel.Value, completedScenarioIds);
+
+        if (!accessMap.TryGetValue(scenario.Id, out var access) || !access.IsUnlocked)
+        {
+            throw new BadRequestException("Scenario is locked for the current user.");
         }
 
         var utcNow = dateTimeProvider.UtcNow;
@@ -99,21 +108,6 @@ public sealed class SessionService(
             if (mistakes.Count > 0)
             {
                 await userMistakeRepository.AddRangeAsync(mistakes, cancellationToken);
-            }
-
-            var user = await userRepository.GetByIdAsync(userId, cancellationToken)
-                ?? throw new NotFoundException("User not found.");
-
-            if (user.CurrentLevel is not null)
-            {
-                var scenarios = await scenarioRepository.GetByLevelAsync(user.CurrentLevel.Value, cancellationToken);
-                var scenarioIds = scenarios.Select(s => s.Id).ToList();
-
-                if (scenarioIds.Count > 0 &&
-                    await userSessionRepository.HasCompletedAllScenariosForLevelAsync(userId, user.CurrentLevel.Value, scenarioIds, cancellationToken))
-                {
-                    user.CurrentLevel = LevelProgressionRules.GetNextLevel(user.CurrentLevel.Value) ?? user.CurrentLevel;
-                }
             }
 
             await unitOfWork.SaveChangesAsync(cancellationToken);

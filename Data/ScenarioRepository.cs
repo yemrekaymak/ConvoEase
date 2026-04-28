@@ -8,10 +8,18 @@ namespace Backend.Data;
 
 public sealed class ScenarioRepository(AppDbContext dbContext) : IScenarioRepository
 {
+    public async Task<IReadOnlyList<Scenario>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.Scenarios
+            .OrderBy(x => x.GroupName)
+            .ThenBy(x => x.OrderIndex)
+            .ThenBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Scenario>> GetAllowedAsync(LanguageLevel level, CancellationToken cancellationToken = default) =>
         await dbContext.Scenarios
             .Where(x => x.DifficultyLevel <= level)
-            .OrderBy(x => x.DifficultyLevel)
+            .OrderBy(x => x.GroupName)
+            .ThenBy(x => x.OrderIndex)
             .ThenBy(x => x.Name)
             .ToListAsync(cancellationToken);
 

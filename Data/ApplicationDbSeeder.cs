@@ -1,6 +1,6 @@
+using Backend.Interfaces;
 using Backend.Models.Entities;
 using Backend.Models.Enums;
-using Backend.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Data;
@@ -26,35 +26,29 @@ public sealed class ApplicationDbSeeder(
         }
 
         await SyncScenariosAsync(cancellationToken);
-
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     private async Task SyncScenariosAsync(CancellationToken cancellationToken)
     {
-        var expectedScenarios = new[]
-        {
-            new ScenarioSeed("Cafe Conversation", LanguageLevel.Beginner),
-            new ScenarioSeed("Hospital Visit", LanguageLevel.Intermediate),
-            new ScenarioSeed("Shopping", LanguageLevel.Beginner),
-            new ScenarioSeed("Hotel Check-in", LanguageLevel.Intermediate),
-            new ScenarioSeed("Job Interview", LanguageLevel.Advanced)
-        };
+        var expectedScenarios = BuildScenarioSeeds();
 
         var existingScenarios = await dbContext.Scenarios.ToListAsync(cancellationToken);
+        var referencedScenarioIds = await dbContext.UserSessions
+            .Select(x => x.ScenarioId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
 
-        foreach (var existingScenario in existingScenarios)
-        {
-            if (expectedScenarios.All(x => !string.Equals(x.Name, existingScenario.Name, StringComparison.OrdinalIgnoreCase)))
-            {
-                dbContext.Scenarios.Remove(existingScenario);
-            }
-        }
+        var matchedExistingIds = new HashSet<int>();
 
         foreach (var expectedScenario in expectedScenarios)
         {
             var existingScenario = existingScenarios.FirstOrDefault(x =>
-                string.Equals(x.Name, expectedScenario.Name, StringComparison.OrdinalIgnoreCase));
+                (!string.IsNullOrWhiteSpace(x.PromptKey) &&
+                 string.Equals(x.GroupKey, expectedScenario.GroupKey, StringComparison.OrdinalIgnoreCase) &&
+                 x.OrderIndex == expectedScenario.OrderIndex) ||
+                (expectedScenario.LegacyName is not null &&
+                 string.Equals(x.Name, expectedScenario.LegacyName, StringComparison.OrdinalIgnoreCase)));
 
             if (existingScenario is null)
             {
@@ -62,19 +56,95 @@ public sealed class ApplicationDbSeeder(
                 [
                     new Scenario
                     {
+                        GroupKey = expectedScenario.GroupKey,
+                        GroupName = expectedScenario.GroupName,
                         Name = expectedScenario.Name,
-                        DifficultyLevel = expectedScenario.DifficultyLevel
+                        PromptKey = expectedScenario.PromptKey,
+                        DifficultyLevel = expectedScenario.DifficultyLevel,
+                        OrderIndex = expectedScenario.OrderIndex
                     }
                 ], cancellationToken);
                 continue;
             }
 
+            matchedExistingIds.Add(existingScenario.Id);
+            existingScenario.GroupKey = expectedScenario.GroupKey;
+            existingScenario.GroupName = expectedScenario.GroupName;
+            existingScenario.Name = expectedScenario.Name;
+            existingScenario.PromptKey = expectedScenario.PromptKey;
             existingScenario.DifficultyLevel = expectedScenario.DifficultyLevel;
+            existingScenario.OrderIndex = expectedScenario.OrderIndex;
+        }
+
+        foreach (var existingScenario in existingScenarios.Where(x =>
+                     !matchedExistingIds.Contains(x.Id) &&
+                     !referencedScenarioIds.Contains(x.Id)))
+        {
+            dbContext.Scenarios.Remove(existingScenario);
         }
     }
 
-    private sealed record ScenarioSeed(string Name, LanguageLevel DifficultyLevel);
+    private static IReadOnlyList<ScenarioSeed> BuildScenarioSeeds()
+    {
+        return
+        [
+            .. BuildGroup("cafe", "Cafe", "kafe", "Cafe Conversation"),
+            .. BuildGroup("hospital", "Hospital", "hastane", "Hospital Visit"),
+            .. BuildGroup("hotel", "Hotel", "otel", "Hotel Check-in"),
+            .. BuildGroup("interview", "Job", "is_gorusmesi", "Job Interview"),
+            .. BuildGroup("shopping", "Shopping", "alisveris", "Shopping")
+        ];
+    }
+
+    private static IEnumerable<ScenarioSeed> BuildGroup(
+        string groupKey,
+        string groupName,
+        string promptKey,
+        string legacyName)
+    {
+        var orderIndex = 1;
+
+        for (var i = 1; i <= 5; i++, orderIndex++)
+        {
+            yield return new ScenarioSeed(
+                groupKey,
+                groupName,
+                $"{groupName} {i}",
+                promptKey,
+                LanguageLevel.Beginner,
+                orderIndex,
+                i == 1 ? legacyName : null);
+        }
+
+        for (var i = 1; i <= 5; i++, orderIndex++)
+        {
+            yield return new ScenarioSeed(
+                groupKey,
+                groupName,
+                $"{groupName} {i}",
+                promptKey,
+                LanguageLevel.Intermediate,
+                orderIndex);
+        }
+
+        for (var i = 1; i <= 5; i++, orderIndex++)
+        {
+            yield return new ScenarioSeed(
+                groupKey,
+                groupName,
+                $"{groupName} {i}",
+                promptKey,
+                LanguageLevel.Advanced,
+                orderIndex);
+        }
+    }
+
+    private sealed record ScenarioSeed(
+        string GroupKey,
+        string GroupName,
+        string Name,
+        string PromptKey,
+        LanguageLevel DifficultyLevel,
+        int OrderIndex,
+        string? LegacyName = null);
 }
-
-
-

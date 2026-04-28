@@ -27,6 +27,14 @@ public sealed class UserSessionRepository(AppDbContext dbContext) : IUserSession
             .OrderByDescending(x => x.UpdatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<IReadOnlySet<int>> GetCompletedScenarioIdsAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        (await dbContext.UserSessions
+            .Where(x => x.UserId == userId && x.IsCompleted)
+            .Select(x => x.ScenarioId)
+            .Distinct()
+            .ToListAsync(cancellationToken))
+        .ToHashSet();
+
     public async Task<bool> HasCompletedAllScenariosForLevelAsync(Guid userId, LanguageLevel level, IEnumerable<int> scenarioIds, CancellationToken cancellationToken = default)
     {
         var completedScenarioIds = await dbContext.UserSessions
@@ -48,6 +56,10 @@ public sealed class UserSessionRepository(AppDbContext dbContext) : IUserSession
         await EnsureColumnExistsAsync("UserSessions", "SummaryReport", "ALTER TABLE UserSessions ADD COLUMN SummaryReport TEXT NULL;", cancellationToken);
         await EnsureColumnExistsAsync("UserMistakes", "WhyWrong", "ALTER TABLE UserMistakes ADD COLUMN WhyWrong TEXT NULL;", cancellationToken);
         await EnsureColumnExistsAsync("UserMistakes", "TeachingTip", "ALTER TABLE UserMistakes ADD COLUMN TeachingTip TEXT NULL;", cancellationToken);
+        await EnsureColumnExistsAsync("Scenarios", "GroupKey", "ALTER TABLE Scenarios ADD COLUMN GroupKey TEXT NOT NULL DEFAULT '';", cancellationToken);
+        await EnsureColumnExistsAsync("Scenarios", "GroupName", "ALTER TABLE Scenarios ADD COLUMN GroupName TEXT NOT NULL DEFAULT '';", cancellationToken);
+        await EnsureColumnExistsAsync("Scenarios", "PromptKey", "ALTER TABLE Scenarios ADD COLUMN PromptKey TEXT NOT NULL DEFAULT '';", cancellationToken);
+        await EnsureColumnExistsAsync("Scenarios", "OrderIndex", "ALTER TABLE Scenarios ADD COLUMN OrderIndex INTEGER NOT NULL DEFAULT 0;", cancellationToken);
     }
 
     private async Task EnsureColumnExistsAsync(string tableName, string columnName, string alterSql, CancellationToken cancellationToken)

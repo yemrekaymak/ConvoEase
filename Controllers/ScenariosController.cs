@@ -9,6 +9,15 @@ namespace Backend.Controllers;
 [Route("api/scenarios")]
 public sealed class ScenariosController(IScenarioService scenarioService) : BaseApiController
 {
+    [AllowAnonymous]
+    [HttpGet("catalog")]
+    public async Task<ActionResult<IReadOnlyList<ScenarioGroupDto>>> GetCatalog(CancellationToken cancellationToken)
+        => Ok(await scenarioService.GetCatalogAsync(cancellationToken));
+
+    [HttpGet("browse")]
+    public async Task<ActionResult<IReadOnlyList<ScenarioGroupDto>>> GetBrowse(CancellationToken cancellationToken)
+        => Ok(await scenarioService.GetBrowseAsync(GetUserId(), cancellationToken));
+
     [HttpGet("allowed")]
     public async Task<ActionResult<IReadOnlyList<ScenarioDto>>> GetAllowed(CancellationToken cancellationToken)
         => Ok(await scenarioService.GetAllowedScenariosAsync(GetUserId(), cancellationToken));
