@@ -17,6 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.convoease.app",
       "infoPlist": {
+        "NSMicrophoneUsageDescription": "Speaking practice icin mikrofon erisimi gerekir.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         }
@@ -27,6 +28,9 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": [
+        "RECORD_AUDIO"
+      ],
       "edgeToEdgeEnabled": false,
       "usesCleartextTraffic": true,
       "predictiveBackGestureEnabled": false,

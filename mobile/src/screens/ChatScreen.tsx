@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -9,164 +10,181 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Audio } from 'expo-av';
+import { apiRequest, getApiBaseUrl } from '../api/client';
 import { FeedbackPanel } from '../components/FeedbackPanel';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { ToastBanner } from '../components/ToastBanner';
+import type {
+  ConversationFeedbackDto,
+  ConversationMessageResponseDto,
+  ConversationStartResponseDto,
+  InteractionType,
+  SessionReportDto,
+} from '../api/types';
+import { getTokens } from '../storage/secure';
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../types/navigation';
-import { apiRequest } from '../api/client';
-import type {
-  CompleteSessionRequestDto,
-  InteractionType,
-  SessionDto,
-  UpdateSessionProgressRequestDto,
-} from '../api/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
-
 type Msg = { id: string; role: 'user' | 'bot'; text: string };
-
-const MOCK_THREAD: Msg[] = [
-  { id: '1', role: 'bot', text: 'Hello! What would you like to order?' },
-  { id: '2', role: 'user', text: 'I want coffee please.' },
-  { id: '3', role: 'bot', text: 'Great. Small, medium, or large?' },
-];
 
 export function ChatScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
-  const { scenarioTitle, difficultyLabel } = route.params;
+  const { scenarioTitle, difficultyLabel, interactionType, interactionLabel } = route.params;
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<Msg[]>(MOCK_THREAD);
-  const [loading, setLoading] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [session, setSession] = useState<SessionDto | null>(null);
-  const [interactionType] = useState<InteractionType>(2); // Writing
-  const recordingRef = useRef<Audio.Recording | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [micError, setMicError] = useState<string | null>(null);
-
-  const hideToast = useCallback(() => setToastVisible(false), []);
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<ConversationFeedbackDto | null>(null);
+  const [selectedInteractionType] = useState<InteractionType>(interactionType);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [recordingBusy, setRecordingBusy] = useState(false);
 
   useEffect(() => {
-    return () => {
-      void (async () => {
-        try {
-          const rec = recordingRef.current;
-          if (rec) {
-            await rec.stopAndUnloadAsync();
-          }
-        } catch {
-          // ignore
-        } finally {
-          recordingRef.current = null;
-        }
-      })();
-    };
-  }, []);
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const started = await apiRequest<ConversationStartResponseDto>('/api/conversations/start', {
+          method: 'POST',
+          body: { scenarioId: route.params.scenarioId, interactionType: selectedInteractionType },
+        });
+        setSessionId(started.sessionId);
+        setMessages([
+          {
+            id: `${started.sessionId}-initial`,
+            role: 'bot',
+            text: started.initialMessage,
+          },
+        ]);
+      } catch (e: any) {
+        setError(e?.message ?? 'Oturum baslatilamadi');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [selectedInteractionType, route.params.scenarioId]);
 
-  const sendMock = async () => {
-    const t = input.trim();
-    if (!t) return;
-    setLoading(true);
+  const sendMessage = async () => {
+    const trimmed = input.trim();
+    if (!trimmed || !sessionId) return;
+
+    const userMsg: Msg = { id: `${Date.now()}-user`, role: 'user', text: trimmed };
+    setMessages((current) => [...current, userMsg]);
     setInput('');
-    const userMsg: Msg = { id: String(Date.now()), role: 'user', text: t };
-    const botMsg: Msg = {
-      id: String(Date.now() + 1),
-      role: 'bot',
-      text: '(Mock) Backend bağlanınca gerçek yanıt gelecek.',
-    };
-    const next = [...messages, userMsg, botMsg];
-    setMessages(next);
+    setSending(true);
+    setError(null);
+
     try {
-      await saveProgress(next);
-    } catch {
-      // ignore progress failures in mock mode
+      const response = await apiRequest<ConversationMessageResponseDto>(
+        `/api/conversations/${sessionId}/message`,
+        {
+          method: 'POST',
+          body: { message: trimmed },
+        }
+      );
+      setFeedback(response.feedback);
+      if (response.characterMessage) {
+        setMessages((current) => [
+          ...current,
+          {
+            id: `${Date.now()}-bot`,
+            role: 'bot',
+            text: response.characterMessage ?? '',
+          },
+        ]);
+      }
+    } catch (e: any) {
+      setError(e?.message ?? 'Mesaj gonderilemedi');
     } finally {
-      setLoading(false);
+      setSending(false);
     }
   };
 
-  const ensureSession = useCallback(async () => {
-    if (session) return session;
-    const created = await apiRequest<SessionDto>('/api/sessions', {
-      method: 'POST',
-      body: { scenarioId: route.params.scenarioId, interactionType },
-    });
-    setSession(created);
-    return created;
-  }, [session, route.params.scenarioId, interactionType]);
+  const sendSpeech = async (uri: string) => {
+    if (!sessionId) return;
 
-  const saveProgress = useCallback(
-    async (nextMessages: Msg[]) => {
-      const s = await ensureSession();
-      const payload = {
-        scenarioId: s.scenarioId,
-        interactionType: s.interactionType,
-        messages: nextMessages.slice(-20), // keep small for 10KB
-      };
-      const json = JSON.stringify(payload);
-      const req: UpdateSessionProgressRequestDto = { lastProgressJson: json };
-      await apiRequest<SessionDto>(`/api/sessions/${s.id}/progress`, {
-        method: 'PATCH',
-        body: req,
-      });
-    },
-    [ensureSession]
-  );
-
-  const toggleRecording = useCallback(async () => {
-    setMicError(null);
-    if (isRecording) {
-      try {
-        const rec = recordingRef.current;
-        if (!rec) {
-          setIsRecording(false);
-          return;
-        }
-        await rec.stopAndUnloadAsync();
-        const status = await rec.getStatusAsync();
-        const uri = rec.getURI();
-        recordingRef.current = null;
-        setIsRecording(false);
-
-        const seconds =
-          typeof (status as any)?.durationMillis === 'number'
-            ? Math.max(1, Math.round((status as any).durationMillis / 1000))
-            : 1;
-
-        // Backend STT yok; şimdilik ses kaydı tamamlandı bilgisini mesaj olarak ekliyoruz.
-        const next: Msg[] = [
-          ...messages,
-          { id: String(Date.now()), role: 'user', text: `🎤 Voice message (${seconds}s)` },
-          {
-            id: String(Date.now() + 1),
-            role: 'bot',
-            text: uri
-              ? '(Mock) Ses kaydı alındı. STT/AI gelince metne çevireceğiz.'
-              : '(Mock) Ses kaydı alındı.',
-          },
-        ];
-        setMessages(next);
-        try {
-          await saveProgress(next);
-        } catch {
-          // ignore
-        }
-      } catch (e: any) {
-        setMicError(e?.message ?? 'Kayıt durdurulamadı');
-        setIsRecording(false);
-      }
-      return;
-    }
+    setSending(true);
+    setError(null);
 
     try {
-      const perm = await Audio.requestPermissionsAsync();
-      if (!perm.granted) {
-        setMicError('Mikrofon izni gerekli.');
+      const baseUrl = await getApiBaseUrl();
+      const tokens = await getTokens();
+      const form = new FormData();
+      form.append('audioFile', {
+        uri,
+        name: 'recording.m4a',
+        type: 'audio/m4a',
+      } as any);
+
+      const response = await fetch(`${baseUrl}/api/conversations/${sessionId}/speech`, {
+        method: 'POST',
+        headers: tokens?.accessToken
+          ? { Authorization: `Bearer ${tokens.accessToken}` }
+          : undefined,
+        body: form,
+      });
+
+      const payload = (await response.json()) as ConversationMessageResponseDto | { message?: string };
+      if (!response.ok) {
+        throw new Error((payload as any)?.message ?? `Request failed (${response.status})`);
+      }
+
+      const messageResponse = payload as ConversationMessageResponseDto;
+      setFeedback(messageResponse.feedback);
+      setMessages((current) => [
+        ...current,
+        {
+          id: `${Date.now()}-user-speech`,
+          role: 'user',
+          text: messageResponse.transcript,
+        },
+        ...(messageResponse.characterMessage
+          ? [
+              {
+                id: `${Date.now()}-bot-speech`,
+                role: 'bot' as const,
+                text: messageResponse.characterMessage,
+              },
+            ]
+          : []),
+      ]);
+    } catch (e: any) {
+      setError(e?.message ?? 'Ses gonderilemedi');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (!sessionId || recordingBusy || sending) return;
+
+    setRecordingBusy(true);
+    setError(null);
+
+    try {
+      if (recording) {
+        await recording.stopAndUnloadAsync();
+        const uri = recording.getURI();
+        setRecording(null);
+        if (!uri) {
+          throw new Error('Ses kaydi alinamadi');
+        }
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+        });
+        await sendSpeech(uri);
         return;
+      }
+
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error('Mikrofon izni gerekli');
       }
 
       await Audio.setAudioModeAsync({
@@ -174,126 +192,147 @@ export function ChatScreen({ navigation, route }: Props) {
         playsInSilentModeIOS: true,
       });
 
-      const rec = new Audio.Recording();
-      await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      await rec.startAsync();
-      recordingRef.current = rec;
-      setIsRecording(true);
+      const nextRecording = new Audio.Recording();
+      await nextRecording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await nextRecording.startAsync();
+      setRecording(nextRecording);
     } catch (e: any) {
-      setMicError(e?.message ?? 'Mikrofon başlatılamadı');
-      setIsRecording(false);
+      setError(e?.message ?? 'Mikrofon baslatilamadi');
+      setRecording(null);
+    } finally {
+      setRecordingBusy(false);
     }
-  }, [isRecording, messages, saveProgress]);
+  };
+
+  const finishSession = useCallback(async () => {
+    if (!sessionId) return;
+
+    setSending(true);
+    setError(null);
+    try {
+      const report = await apiRequest<SessionReportDto>(
+        `/api/conversations/${sessionId}/finish`,
+        { method: 'POST' }
+      );
+      navigation.navigate('Summary', {
+        scenarioTitle: report.scenarioName || scenarioTitle,
+        difficultyLabel,
+        interactionLabel,
+        score: report.score,
+        summaryReport: report.summaryReport,
+      });
+    } catch (e: any) {
+      setError(e?.message ?? 'Oturum bitirilemedi');
+    } finally {
+      setSending(false);
+    }
+  }, [difficultyLabel, interactionLabel, navigation, scenarioTitle, sessionId]);
+
+  const feedbackMessage =
+    feedback?.writingFeedback ||
+    feedback?.encouragement ||
+    feedback?.errors?.[0]?.teachingTip ||
+    null;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
-          <Text style={styles.back}>‹ Geri</Text>
+          <Text style={styles.back}>{'< Geri'}</Text>
         </Pressable>
         <View style={styles.headerMid}>
           <Text style={styles.headerTitle}>{scenarioTitle}</Text>
-          <Text style={styles.headerSub}>{difficultyLabel}</Text>
+          <Text style={styles.headerSub}>{difficultyLabel} - {interactionLabel}</Text>
         </View>
-        <Pressable onPress={() => setToastVisible(true)} hitSlop={12}>
-          <Text style={styles.toastLink}>Toast</Text>
-        </Pressable>
+        <View style={styles.headerRight} />
       </View>
 
-      <ToastBanner
-        visible={toastVisible}
-        message="Örnek: “I would like…” siparişte daha doğal olabilir."
-        onHide={hideToast}
-      />
-
-      <FeedbackPanel message="İpucu: “I’d like…” nazik sipariş için uygundur. (Statik örnek)" />
-      {micError ? <Text style={styles.micError}>{micError}</Text> : null}
+      {feedbackMessage ? <FeedbackPanel message={feedbackMessage} /> : null}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
-        <FlatList
-          data={messages}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
-          renderItem={({ item }) => (
-            <View
-              style={[
-                styles.bubbleWrap,
-                item.role === 'user' ? styles.bubbleWrapUser : styles.bubbleWrapBot,
-              ]}
-            >
+        {loading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator />
+          </View>
+        ) : (
+          <FlatList
+            data={messages}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+            style={styles.listView}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
+            renderItem={({ item }) => (
               <View
                 style={[
-                  styles.bubble,
-                  item.role === 'user' ? styles.bubbleUser : styles.bubbleBot,
+                  styles.bubbleWrap,
+                  item.role === 'user' ? styles.bubbleWrapUser : styles.bubbleWrapBot,
                 ]}
               >
-                <Text
-                  style={item.role === 'user' ? styles.bubbleTextUser : styles.bubbleTextBot}
+                <View
+                  style={[
+                    styles.bubble,
+                    item.role === 'user' ? styles.bubbleUser : styles.bubbleBot,
+                  ]}
                 >
-                  {item.text}
-                </Text>
+                  <Text style={item.role === 'user' ? styles.bubbleTextUser : styles.bubbleTextBot}>
+                    {item.text}
+                  </Text>
+                </View>
               </View>
-            </View>
-          )}
-          ListFooterComponent={
-            loading ? <Text style={styles.typing}>Bot yazıyor…</Text> : null
-          }
-        />
-
-        <View style={styles.composer}>
-          <Pressable
-            style={[styles.mic, isRecording && styles.micActive]}
-            hitSlop={8}
-            onPress={toggleRecording}
-          >
-            <Text style={styles.micText}>{isRecording ? '⏺' : '🎤'}</Text>
-          </Pressable>
-          <TextInput
-            style={styles.input}
-            placeholder="İngilizce yaz…"
-            placeholderTextColor={colors.textSecondary}
-            value={input}
-            onChangeText={setInput}
-            multiline
+            )}
+            ListFooterComponent={sending ? <Text style={styles.typing}>Yanit bekleniyor...</Text> : <View style={styles.listSpacer} />}
           />
-          <Pressable
-            onPress={sendMock}
-            style={[styles.send, !input.trim() && styles.sendDisabled]}
-            disabled={!input.trim() || loading}
-          >
-            <Text style={styles.sendText}>Gönder</Text>
-          </Pressable>
-        </View>
+        )}
 
-        <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+        <View style={[styles.bottomDock, { paddingBottom: 12 + insets.bottom }]}>
+          <View style={styles.composer}>
+            {selectedInteractionType === 1 ? (
+              <Pressable
+                onPress={toggleRecording}
+                style={[
+                  styles.micButton,
+                  (recordingBusy || !sessionId || sending) && styles.sendDisabled,
+                  recording && styles.micButtonActive,
+                ]}
+                disabled={recordingBusy || !sessionId || sending}
+              >
+                <Text style={styles.micText}>{recording ? 'Kaydi durdur' : 'Mikrofonu ac'}</Text>
+              </Pressable>
+            ) : (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ingilizce yaz..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={input}
+                  onChangeText={setInput}
+                  editable={!loading && !!sessionId && !sending}
+                  multiline
+                  scrollEnabled
+                  textAlignVertical="top"
+                />
+                <Pressable
+                  onPress={sendMessage}
+                  style={[styles.send, (!input.trim() || !sessionId || sending) && styles.sendDisabled]}
+                  disabled={!input.trim() || !sessionId || sending}
+                >
+                  <Text style={styles.sendText}>Gonder</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+
           <PrimaryButton
-            title="Oturumu bitir"
+            title={sending ? '...' : 'Oturumu bitir'}
             variant="outline"
-            onPress={async () => {
-              setLoading(true);
-              try {
-                const s = await ensureSession();
-                const req: CompleteSessionRequestDto = {
-                  sessionId: s.id,
-                  score: 0,
-                  summaryReport: 'Demo summary (AI/harici servis sonra eklenecek).',
-                  mistakes: [],
-                };
-                await apiRequest<SessionDto>('/api/sessions/complete', {
-                  method: 'POST',
-                  body: req,
-                });
-              } finally {
-                setLoading(false);
-              }
-              navigation.navigate('Summary', { scenarioTitle, difficultyLabel });
-            }}
+            disabled={!sessionId || sending}
+            onPress={finishSession}
           />
         </View>
       </KeyboardAvoidingView>
@@ -315,77 +354,84 @@ const styles = StyleSheet.create({
   },
   back: { fontSize: 16, color: colors.primary, fontWeight: '600', width: 72 },
   headerMid: { flex: 1, alignItems: 'center' },
+  headerRight: { width: 72 },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
   headerSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  toastLink: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '600',
-    width: 72,
-    textAlign: 'right',
-  },
-  list: { padding: 16, paddingBottom: 16 },
+  loading: { flex: 1, justifyContent: 'center' },
+  error: { color: '#9B1C1C', marginHorizontal: 16, marginBottom: 8 },
+  listView: { flex: 1 },
+  list: { padding: 16, paddingBottom: 12 },
+  listSpacer: { height: 8 },
   bubbleWrap: { marginBottom: 10, maxWidth: '88%' },
   bubbleWrapUser: { alignSelf: 'flex-end' },
   bubbleWrapBot: { alignSelf: 'flex-start' },
   bubble: { borderRadius: 16, paddingVertical: 10, paddingHorizontal: 14 },
   bubbleUser: { backgroundColor: colors.userBubble },
   bubbleBot: { backgroundColor: colors.botBubble },
-  bubbleTextUser: { color: '#fff', fontSize: 16, lineHeight: 22 },
-  bubbleTextBot: { color: colors.text, fontSize: 16, lineHeight: 22 },
+  bubbleTextUser: { color: '#fff', fontSize: 16, lineHeight: 22, flexShrink: 1 },
+  bubbleTextBot: { color: colors.text, fontSize: 16, lineHeight: 22, flexShrink: 1 },
   typing: {
     fontSize: 13,
     color: colors.textSecondary,
     fontStyle: 'italic',
     marginBottom: 8,
   },
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 10,
-    gap: 8,
+  bottomDock: {
     backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    gap: 10,
   },
-  mic: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.botBubble,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
   },
-  micActive: {
-    backgroundColor: '#FFE1E1',
-  },
-  micText: { fontSize: 20 },
   input: {
     flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
+    minHeight: 84,
+    maxHeight: 160,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
+    lineHeight: 22,
     color: colors.text,
     backgroundColor: colors.background,
   },
+  micButton: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: '#E8F5F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  micButtonActive: {
+    backgroundColor: '#D9534F',
+    borderColor: '#D9534F',
+  },
+  micText: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 15,
+  },
   send: {
     justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 56,
+    minWidth: 84,
     paddingHorizontal: 14,
-    paddingVertical: 12,
     borderRadius: 12,
     backgroundColor: colors.primary,
-    marginBottom: 2,
   },
   sendDisabled: { opacity: 0.4 },
   sendText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  footer: { paddingHorizontal: 16, paddingTop: 4, backgroundColor: colors.surface },
-  micError: { marginHorizontal: 16, marginBottom: 8, color: '#9B1C1C' },
 });

@@ -2,25 +2,25 @@ import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useAuth } from '../auth/AuthContext';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../types/navigation';
-import { useAuth } from '../auth/AuthContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export function LoginScreen({ navigation }: Props) {
-  const { login, apiBaseUrl, setApiBaseUrl } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [baseUrl, setBaseUrl] = useState(apiBaseUrl);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,28 +35,12 @@ export function LoginScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
         >
-          <Text style={styles.logo}>ConvoEase</Text>
-          <Text style={styles.tagline}>
-            Backend ile entegre (JWT + refresh). Önce API URL’yi kontrol et, sonra giriş yap.
-          </Text>
+          <Pressable onPress={() => navigation.navigate('Home')} hitSlop={12}>
+            <Text style={styles.logo}>ConvoEase</Text>
+          </Pressable>
+          <Text style={styles.tagline}>Hesabin varsa giris yap.</Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          <TextInput
-            style={styles.input}
-            placeholder="API Base URL (örn: http://192.168.1.160:5136)"
-            placeholderTextColor={colors.textSecondary}
-            value={baseUrl}
-            onChangeText={setBaseUrl}
-            autoCapitalize="none"
-          />
-          <PrimaryButton
-            title="API URL kaydet"
-            variant="outline"
-            onPress={async () => {
-              setError(null);
-              await setApiBaseUrl(baseUrl);
-            }}
-            style={styles.smallButton}
-          />
+
           <TextInput
             style={styles.input}
             placeholder="E-posta"
@@ -68,31 +52,40 @@ export function LoginScreen({ navigation }: Props) {
           />
           <TextInput
             style={styles.input}
-            placeholder="Şifre"
+            placeholder="Sifre"
             placeholderTextColor={colors.textSecondary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
           />
+
           <PrimaryButton
-            title={busy ? '...' : 'Giriş yap'}
+            title={busy ? '...' : 'Giris yap'}
             disabled={busy}
             onPress={async () => {
               setBusy(true);
               setError(null);
               try {
-                await login({ email, password });
-                navigation.reset({ index: 0, routes: [{ name: 'Placement' }] });
+                const user = await login({ email: email.trim(), password });
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: user.currentLevel ? 'Home' : 'Placement' }],
+                });
               } catch (e: any) {
-                setError(e?.message ?? 'Giriş başarısız');
+                setError(
+                  e?.message === 'Network request failed'
+                    ? 'Backend baglantisi kurulamadi. Backend servisinin acik oldugundan emin ol.'
+                    : e?.message ?? 'Giris basarisiz'
+                );
               } finally {
                 setBusy(false);
               }
             }}
             style={styles.button}
           />
+
           <PrimaryButton
-            title="Hesabın yok mu? Kayıt ol"
+            title="Hesabin yok mu? Kayit ol"
             variant="outline"
             onPress={() => navigation.navigate('Register')}
             style={styles.secondary}
@@ -131,7 +124,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 12,
   },
-  smallButton: { marginBottom: 14, paddingVertical: 10 },
   button: { marginTop: 8 },
   secondary: { marginTop: 10 },
   error: { color: '#9B1C1C', marginBottom: 12 },

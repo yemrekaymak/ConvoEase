@@ -6,7 +6,7 @@ import type {
   RegisterRequestDto,
   UserSummaryDto,
 } from '../api/types';
-import { clearTokens, getSettings, getTokens, setTokens } from '../storage/secure';
+import { clearTokens, getSettings, setTokens } from '../storage/secure';
 
 type AuthState =
   | { status: 'loading' }
@@ -17,8 +17,8 @@ type AuthContextValue = {
   state: AuthState;
   apiBaseUrl: string;
   setApiBaseUrl: (url: string) => Promise<void>;
-  login: (req: LoginRequestDto) => Promise<void>;
-  register: (req: RegisterRequestDto) => Promise<void>;
+  login: (req: LoginRequestDto) => Promise<UserSummaryDto>;
+  register: (req: RegisterRequestDto) => Promise<UserSummaryDto>;
   logout: () => Promise<void>;
 };
 
@@ -32,13 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       const settings = await getSettings();
       if (settings?.apiBaseUrl) setApiBaseUrlState(settings.apiBaseUrl);
-      const tokens = await getTokens();
-      if (!tokens?.accessToken) {
-        setState({ status: 'signed_out' });
-        return;
-      }
-      // We don't have a "me" endpoint; treat as signed-in, user will be refreshed on next auth call.
-      setState({ status: 'signed_in', user: { id: 'unknown', firstName: '', lastName: '', email: '', currentLevel: null } });
+      await clearTokens();
+      setState({ status: 'signed_out' });
     })();
   }, []);
 
@@ -65,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         auth: false,
       });
       await applyAuth(auth);
+      return auth.user;
     },
     [applyAuth]
   );
@@ -77,6 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         auth: false,
       });
       await applyAuth(auth);
+      return auth.user;
     },
     [applyAuth]
   );

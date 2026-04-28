@@ -2,24 +2,24 @@ import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useAuth } from '../auth/AuthContext';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../types/navigation';
-import { useAuth } from '../auth/AuthContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
 export function RegisterScreen({ navigation }: Props) {
   const { register } = useAuth();
-  const [firstName, setFirstName] = useState('Berdan');
-  const [lastName, setLastName] = useState('User');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,7 +36,7 @@ export function RegisterScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
         >
-          <Text style={styles.logo}>Kayıt</Text>
+          <Text style={styles.logo}>Kayit</Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <TextInput
@@ -64,7 +64,7 @@ export function RegisterScreen({ navigation }: Props) {
           />
           <TextInput
             style={styles.input}
-            placeholder="Şifre (min 8, A/a/0)"
+            placeholder="Sifre (min 8, A/a/0)"
             placeholderTextColor={colors.textSecondary}
             value={password}
             onChangeText={setPassword}
@@ -72,16 +72,21 @@ export function RegisterScreen({ navigation }: Props) {
           />
 
           <PrimaryButton
-            title={busy ? '...' : 'Hesap oluştur'}
+            title={busy ? '...' : 'Hesap olustur'}
             disabled={busy}
             onPress={async () => {
               setBusy(true);
               setError(null);
               try {
-                await register({ firstName, lastName, email, password });
+                await register({
+                  firstName: firstName.trim(),
+                  lastName: lastName.trim(),
+                  email: email.trim(),
+                  password,
+                });
                 navigation.reset({ index: 0, routes: [{ name: 'Placement' }] });
               } catch (e: any) {
-                setError(e?.message ?? 'Kayıt başarısız');
+                setError(e?.message ?? 'Kayit basarisiz');
               } finally {
                 setBusy(false);
               }
@@ -90,7 +95,7 @@ export function RegisterScreen({ navigation }: Props) {
           />
 
           <PrimaryButton
-            title="Geri dön"
+            title="Geri don"
             variant="outline"
             onPress={() => navigation.goBack()}
             style={styles.secondary}
@@ -127,4 +132,3 @@ const styles = StyleSheet.create({
   secondary: { marginTop: 10 },
   error: { color: '#9B1C1C', marginBottom: 12 },
 });
-

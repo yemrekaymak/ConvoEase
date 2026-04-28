@@ -17,7 +17,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.warningSoft,
     borderWidth: 1,
     borderColor: colors.warningBorder,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 12,
     marginHorizontal: 16,
     marginBottom: 8,
