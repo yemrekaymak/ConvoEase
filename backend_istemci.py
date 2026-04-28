@@ -13,15 +13,14 @@ CEFR_TO_BACKEND_LEVEL = {
     "C2": 3,
 }
 
-SCENARIO_NAME_TO_SLUG = {
-    "Cafe Conversation": "kafe",
-    "Hospital Visit": "hastane",
-    "Shopping": "alisveris",
-    "Hotel Check-in": "otel",
-    "Job Interview": "is_gorusmesi",
+SCENARIO_SLUG_TO_NAME = {
+    "kafe": "Cafe",
+    "hastane": "Hospital",
+    "alisveris": "Shopping",
+    "otel": "Hotel",
+    "is_gorusmesi": "Job Interview",
 }
 
-SCENARIO_SLUG_TO_NAME = {value: key for key, value in SCENARIO_NAME_TO_SLUG.items()}
 INTERACTION_TYPE_TO_BACKEND = {
     "speaking": 1,
     "writing": 2,
@@ -52,8 +51,8 @@ class BackendIstemci:
         veri = self._json_istek("GET", "/api/scenarios/allowed")
         sonuc = []
         for kayit in veri:
-            slug = SCENARIO_NAME_TO_SLUG.get(kayit["name"])
-            if slug is None:
+            slug = str(kayit.get("promptKey") or "").strip()
+            if not slug:
                 continue
             sonuc.append(
                 AllowedScenario(

@@ -110,11 +110,14 @@ class Degerlendirici:
             interaction_type=interaction_type
         )
 
-        yanit = ai_yanit_al(
-            sistem_promptu=sistem_promptu,
-            mesajlar=[{"role": "user", "content": kullanici_mesaji}],
-            max_token=512
-        )
+        try:
+            yanit = ai_yanit_al(
+                sistem_promptu=sistem_promptu,
+                mesajlar=[{"role": "user", "content": kullanici_mesaji}],
+                max_token=512
+            )
+        except Exception:
+            yanit = ""
 
         veri = _json_ayikla(yanit)
 
@@ -124,11 +127,14 @@ class Degerlendirici:
             sonuc = _sonucu_dogrula(veri, tur_no)
 
         if interaction_type == "writing":
-            sonuc["geri_bildirim"] = self.yazma_geri_bildirimi_olustur(
-                kullanici_mesaji=kullanici_mesaji,
-                seviye=seviye,
-                senaryo=senaryo
-            )
+            try:
+                sonuc["geri_bildirim"] = self.yazma_geri_bildirimi_olustur(
+                    kullanici_mesaji=kullanici_mesaji,
+                    seviye=seviye,
+                    senaryo=senaryo
+                )
+            except Exception:
+                sonuc["geri_bildirim"] = "Mesajin anlasiliyor. Cumlelerini biraz daha acik ve duzenli yazmaya calis."
 
         return sonuc
 
@@ -156,11 +162,18 @@ class Degerlendirici:
             error_summary=json.dumps(hata_sayac, ensure_ascii=False)
         )
 
-        return ai_yanit_al(
-            sistem_promptu=sistem_promptu,
-            mesajlar=[{"role": "user", "content": "Raporu olustur."}],
-            max_token=1024
-        )
+        try:
+            return ai_yanit_al(
+                sistem_promptu=sistem_promptu,
+                mesajlar=[{"role": "user", "content": "Raporu olustur."}],
+                max_token=1024
+            )
+        except Exception:
+            return (
+                f"Bu oturumda {toplam_tur} tur pratik yaptin. "
+                "Iletisimi surdurebildin ve temel mesajini aktarabildin. "
+                "Bir sonraki denemede daha uzun cumleler ve daha dogru kelime secimi uzerine odaklan."
+            )
 
     def yazma_geri_bildirimi_olustur(
         self,
