@@ -49,6 +49,17 @@ public sealed class ConversationMessageResponseDto
     public required ConversationFeedbackDto Feedback { get; init; }
 }
 
+public sealed class ConversationTranscriptResponseDto
+{
+    public required Guid SessionId { get; init; }
+    public required string Transcript { get; init; }
+}
+
+public sealed class TranscriptionPreviewResponseDto
+{
+    public required string Transcript { get; init; }
+}
+
 public sealed class ActiveConversationDto
 {
     public required Guid SessionId { get; init; }

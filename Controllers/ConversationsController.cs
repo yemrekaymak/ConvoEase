@@ -26,6 +26,16 @@ public sealed class ConversationsController(IConversationService conversationSer
     public async Task<ActionResult<ConversationMessageResponseDto>> SendSpeech(Guid sessionId, [FromForm] IFormFile audioFile, CancellationToken cancellationToken)
         => Ok(await conversationService.SendAudioAsync(GetUserId(), sessionId, audioFile, cancellationToken));
 
+    [HttpPost("{sessionId:guid}/transcribe")]
+    [RequestSizeLimit(15 * 1024 * 1024)]
+    public async Task<ActionResult<ConversationTranscriptResponseDto>> Transcribe(Guid sessionId, [FromForm] IFormFile audioFile, CancellationToken cancellationToken)
+        => Ok(await conversationService.TranscribeAudioAsync(GetUserId(), sessionId, audioFile, cancellationToken));
+
+    [HttpPost("transcribe-preview")]
+    [RequestSizeLimit(15 * 1024 * 1024)]
+    public async Task<ActionResult<TranscriptionPreviewResponseDto>> TranscribePreview([FromForm] IFormFile audioFile, CancellationToken cancellationToken)
+        => Ok(await conversationService.PreviewTranscriptionAsync(audioFile, cancellationToken));
+
     [HttpPost("{sessionId:guid}/finish")]
     public async Task<ActionResult<SessionReportDto>> Finish(Guid sessionId, CancellationToken cancellationToken)
         => Ok(await conversationService.FinishAsync(GetUserId(), sessionId, cancellationToken));

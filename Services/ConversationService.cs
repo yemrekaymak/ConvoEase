@@ -98,6 +98,12 @@ public sealed class ConversationService(
 
     public async Task<ConversationMessageResponseDto> SendAudioAsync(Guid userId, Guid sessionId, IFormFile audioFile, CancellationToken cancellationToken = default)
     {
+        var transcription = await TranscribeAudioAsync(userId, sessionId, audioFile, cancellationToken);
+        return await SendMessageAsync(userId, sessionId, transcription.Transcript, cancellationToken);
+    }
+
+    public async Task<ConversationTranscriptResponseDto> TranscribeAudioAsync(Guid userId, Guid sessionId, IFormFile audioFile, CancellationToken cancellationToken = default)
+    {
         if (audioFile.Length <= 0)
         {
             throw new BadRequestException("Audio file is required.");
@@ -116,7 +122,35 @@ public sealed class ConversationService(
         form.Add(fileContent, "dosya", audioFile.FileName);
 
         var transcription = await PostMultipartAsync<AiTranscriptionResponse>("/backend/ses-metni", form, cancellationToken);
-        return await SendMessageAsync(userId, sessionId, transcription.Transcript, cancellationToken);
+        return new ConversationTranscriptResponseDto
+        {
+            SessionId = sessionId,
+            Transcript = transcription.Transcript
+        };
+    }
+
+    public async Task<TranscriptionPreviewResponseDto> PreviewTranscriptionAsync(IFormFile audioFile, CancellationToken cancellationToken = default)
+    {
+        if (audioFile.Length <= 0)
+        {
+            throw new BadRequestException("Audio file is required.");
+        }
+
+        using var form = new MultipartFormDataContent();
+        await using var stream = audioFile.OpenReadStream();
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory, cancellationToken);
+        memory.Position = 0;
+
+        using var fileContent = new ByteArrayContent(memory.ToArray());
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(audioFile.ContentType ?? "audio/m4a");
+        form.Add(fileContent, "dosya", audioFile.FileName);
+
+        var transcription = await PostMultipartAsync<AiTranscriptionResponse>("/backend/ses-metni", form, cancellationToken);
+        return new TranscriptionPreviewResponseDto
+        {
+            Transcript = transcription.Transcript
+        };
     }
 
     public async Task<SessionReportDto> FinishAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default)
@@ -218,7 +252,7 @@ public sealed class ConversationService(
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new BadRequestException($"AI request failed: {body}");
+            throw new BadRequestException(ExtractAiErrorMessage(body));
         }
 
         var value = JsonSerializer.Deserialize<T>(body, JsonOptions);
@@ -228,6 +262,38 @@ public sealed class ConversationService(
         }
 
         return value;
+    }
+
+    private static string ExtractAiErrorMessage(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return "AI request failed.";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                if (root.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
+                {
+                    return detail.GetString() ?? "AI request failed.";
+                }
+
+                if (root.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String)
+                {
+                    return message.GetString() ?? "AI request failed.";
+                }
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return $"AI request failed: {body}";
     }
 
     private static SessionMistakeInputDto MapMistake(AiMistake mistake) =>
