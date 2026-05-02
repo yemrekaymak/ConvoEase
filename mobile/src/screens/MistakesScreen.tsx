@@ -7,6 +7,8 @@ import { apiRequest } from '../api/client';
 import { PrimaryButton } from '../components/PrimaryButton';
 import type { MistakeDto, PagedResponseDto } from '../api/types';
 import { colors } from '../theme/colors';
+import type { MiniGameReviewItem } from '../types/miniGames';
+import { getMiniGameReviews } from '../utils/miniGameReview';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Mistakes'>;
@@ -16,6 +18,7 @@ export function MistakesScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<MistakeDto[]>([]);
+  const [miniGameItems, setMiniGameItems] = useState<MiniGameReviewItem[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
@@ -46,6 +49,7 @@ export function MistakesScreen({ navigation }: Props) {
     }
 
     void load(1);
+    void getMiniGameReviews().then(setMiniGameItems);
   }, [state.status]);
 
   return (
@@ -73,6 +77,28 @@ export function MistakesScreen({ navigation }: Props) {
           </View>
         ))}
 
+        {miniGameItems.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Mini game review</Text>
+            {miniGameItems.map((item) => (
+              <View key={item.id} style={styles.card}>
+                <Text style={styles.meta}>{item.scenarioTitle} - {item.difficultyLabel}</Text>
+                <Text style={styles.type}>{item.type}</Text>
+                <Text style={styles.label}>Deneme:</Text>
+                <Text style={styles.body}>{item.wrongAnswer}</Text>
+                <Text style={styles.label}>Dogrusu:</Text>
+                <Text style={styles.body}>{item.correction}</Text>
+                {item.note ? (
+                  <>
+                    <Text style={styles.label}>Not:</Text>
+                    <Text style={styles.body}>{item.note}</Text>
+                  </>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {hasMore ? (
           <PrimaryButton
             title={loading ? '...' : 'Daha fazla yukle'}
@@ -90,6 +116,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 20, paddingBottom: 32 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  section: { marginTop: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
   back: { fontSize: 16, color: colors.primary, fontWeight: '700' },
   heading: { fontSize: 22, fontWeight: '800', color: colors.text },
   spacer: { width: 60 },

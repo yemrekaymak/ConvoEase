@@ -15,6 +15,8 @@ import { apiRequest, ApiError } from '../api/client';
 import { PrimaryButton } from '../components/PrimaryButton';
 import type { ScenarioGroupDto } from '../api/types';
 import { colors } from '../theme/colors';
+import type { MiniGameProgressSnapshot } from '../types/miniGames';
+import { getMiniGameProgress } from '../utils/miniGameReview';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -25,6 +27,7 @@ export function HomeScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [groups, setGroups] = useState<ScenarioGroupDto[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [miniGameProgress, setMiniGameProgress] = useState<MiniGameProgressSnapshot | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -49,6 +52,10 @@ export function HomeScreen({ navigation }: Props) {
     })();
   }, [state.status]);
 
+  useEffect(() => {
+    void getMiniGameProgress().then(setMiniGameProgress);
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -62,6 +69,18 @@ export function HomeScreen({ navigation }: Props) {
         <Text style={styles.sub}>
           Bir ana senaryo sec. Alt senaryolar kolay, orta ve zor olarak sonraki sayfada acilacak.
         </Text>
+
+        {miniGameProgress ? (
+          <View style={styles.progressCard}>
+            <Text style={styles.progressTitle}>Mini game ilerlemesi</Text>
+            <Text style={styles.progressMeta}>
+              XP: {miniGameProgress.totalXp} | Yildiz: {miniGameProgress.stars}
+            </Text>
+            <Text style={styles.progressMeta}>
+              Tamamlanan: {miniGameProgress.completedCount} | Review: {miniGameProgress.needsReviewCount}
+            </Text>
+          </View>
+        ) : null}
 
         {loading ? <ActivityIndicator /> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -154,6 +173,16 @@ const styles = StyleSheet.create({
   },
   menuIcon: { fontSize: 22, fontWeight: '800', color: colors.text },
   sub: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 20 },
+  progressCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    marginBottom: 18,
+  },
+  progressTitle: { fontSize: 15, fontWeight: '800', color: colors.text, marginBottom: 6 },
+  progressMeta: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   error: { color: '#9B1C1C', marginBottom: 12 },
   section: { marginBottom: 18 },
   groupCard: {

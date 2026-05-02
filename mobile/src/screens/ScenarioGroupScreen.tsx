@@ -151,6 +151,62 @@ export function ScenarioGroupScreen({ navigation, route }: Props) {
           </View>
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Mini ogrenme alanlari</Text>
+          <View style={styles.gameList}>
+            <Pressable
+              onPress={() => {
+                if (!selectedScenario) return;
+                navigation.navigate('ScenarioDictionary', {
+                  scenarioId: selectedScenario.id,
+                  scenarioTitle: selectedScenario.name,
+                  promptKey: selectedScenario.promptKey,
+                  difficultyLevel: selectedScenario.difficultyLevel,
+                  difficultyLabel: getDifficultyLabel(selectedScenario.difficultyLevel),
+                });
+              }}
+              style={[styles.gameCard, !selectedScenario && styles.gameCardDisabled]}
+            >
+              <Text style={styles.gameTitle}>Dictionary</Text>
+              <Text style={styles.gameMeta}>Senaryo kelimeleri, anlamlar ve ornekler</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                if (!selectedScenario) return;
+                navigation.navigate('SentenceBuilder', {
+                  scenarioId: selectedScenario.id,
+                  scenarioTitle: selectedScenario.name,
+                  promptKey: selectedScenario.promptKey,
+                  difficultyLevel: selectedScenario.difficultyLevel,
+                  difficultyLabel: getDifficultyLabel(selectedScenario.difficultyLevel),
+                });
+              }}
+              style={[styles.gameCard, !selectedScenario && styles.gameCardDisabled]}
+            >
+              <Text style={styles.gameTitle}>Sentence Builder</Text>
+              <Text style={styles.gameMeta}>Cumleyi dogru siraya koy, sonra sesli dene</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                if (!selectedScenario) return;
+                navigation.navigate('WordMatching', {
+                  scenarioId: selectedScenario.id,
+                  scenarioTitle: selectedScenario.name,
+                  promptKey: selectedScenario.promptKey,
+                  difficultyLevel: selectedScenario.difficultyLevel,
+                  difficultyLabel: getDifficultyLabel(selectedScenario.difficultyLevel),
+                });
+              }}
+              style={[styles.gameCard, !selectedScenario && styles.gameCardDisabled]}
+            >
+              <Text style={styles.gameTitle}>Word Matching</Text>
+              <Text style={styles.gameMeta}>Ingilizce kelimeleri Turkce anlamlariyla eslestir</Text>
+            </Pressable>
+          </View>
+        </View>
+
         <PrimaryButton
           title={state.status === 'signed_in' ? 'Secili alt senaryoyu baslat' : 'Giris yaparak baslat'}
           disabled={state.status === 'signed_in' ? !selectedScenario : false}
@@ -223,4 +279,15 @@ const styles = StyleSheet.create({
   },
   modeTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
   modeMeta: { marginTop: 4, fontSize: 13, color: colors.textSecondary },
+  gameList: { gap: 10 },
+  gameCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+  },
+  gameCardDisabled: { opacity: 0.5 },
+  gameTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  gameMeta: { marginTop: 4, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
 });

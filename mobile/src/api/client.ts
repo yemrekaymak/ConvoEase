@@ -12,7 +12,16 @@ export class ApiError extends Error {
   }
 }
 
-const FALLBACK_API_BASE_URL = 'http://192.168.1.105:5136';
+const FALLBACK_API_BASE_URL = 'http://127.0.0.1:5136';
+const IPV4_HOST_REGEX = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+
+function normalizeApiBaseUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return getDefaultApiBaseUrl();
+
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  return withScheme.replace(/\/+$/, '');
+}
 
 function getBundleHost(): string | null {
   const scriptURL = NativeModules?.SourceCode?.scriptURL as string | undefined;
@@ -23,8 +32,18 @@ function getBundleHost(): string | null {
 }
 
 function getDefaultApiBaseUrl(): string {
+  const envBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (envBaseUrl) {
+    return normalizeApiBaseUrl(envBaseUrl);
+  }
+
   const bundleHost = getBundleHost();
-  if (bundleHost && bundleHost !== 'localhost' && bundleHost !== '127.0.0.1') {
+  if (
+    bundleHost &&
+    bundleHost !== 'localhost' &&
+    bundleHost !== '127.0.0.1' &&
+    IPV4_HOST_REGEX.test(bundleHost)
+  ) {
     return `http://${bundleHost}:5136`;
   }
 
@@ -35,12 +54,14 @@ let cachedBaseUrl: string | null = null;
 
 export async function getApiBaseUrl(): Promise<string> {
   if (cachedBaseUrl) return cachedBaseUrl;
-  cachedBaseUrl = getDefaultApiBaseUrl().replace(/\/+$/, '');
+  const settings = await (await import('../storage/secure')).getSettings();
+  const detectedBaseUrl = getDefaultApiBaseUrl();
+  cachedBaseUrl = normalizeApiBaseUrl(detectedBaseUrl || settings?.apiBaseUrl || FALLBACK_API_BASE_URL);
   return cachedBaseUrl;
 }
 
 export async function setApiBaseUrl(url: string): Promise<void> {
-  cachedBaseUrl = url.replace(/\/+$/, '');
+  cachedBaseUrl = normalizeApiBaseUrl(url);
   await (await import('../storage/secure')).setSettings({ apiBaseUrl: cachedBaseUrl });
 }
 

@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { apiRequest, setApiBaseUrl } from '../api/client';
+import { apiRequest, getApiBaseUrl } from '../api/client';
 import type {
   AuthResponseDto,
   LoginRequestDto,
   RegisterRequestDto,
   UserSummaryDto,
 } from '../api/types';
-import { clearTokens, getSettings, setTokens } from '../storage/secure';
+import { clearTokens, getTokens, setTokens } from '../storage/secure';
 
 type AuthState =
   | { status: 'loading' }
@@ -16,7 +16,6 @@ type AuthState =
 type AuthContextValue = {
   state: AuthState;
   apiBaseUrl: string;
-  setApiBaseUrl: (url: string) => Promise<void>;
   login: (req: LoginRequestDto) => Promise<UserSummaryDto>;
   register: (req: RegisterRequestDto) => Promise<UserSummaryDto>;
   logout: () => Promise<void>;
@@ -26,20 +25,25 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' });
-  const [apiBaseUrl, setApiBaseUrlState] = useState('http://192.168.1.160:5136');
+  const [apiBaseUrl, setApiBaseUrlState] = useState('');
 
   useEffect(() => {
     (async () => {
-      const settings = await getSettings();
-      if (settings?.apiBaseUrl) setApiBaseUrlState(settings.apiBaseUrl);
+      const baseUrl = await getApiBaseUrl();
+      setApiBaseUrlState(baseUrl);
+      const tokens = await getTokens();
+      const refreshExpiry = tokens?.refreshTokenExpiresAtUtc
+        ? new Date(tokens.refreshTokenExpiresAtUtc).getTime()
+        : 0;
+
+      if (tokens?.user && refreshExpiry > Date.now()) {
+        setState({ status: 'signed_in', user: tokens.user });
+        return;
+      }
+
       await clearTokens();
       setState({ status: 'signed_out' });
     })();
-  }, []);
-
-  const setBaseUrl = useCallback(async (url: string) => {
-    await setApiBaseUrl(url);
-    setApiBaseUrlState(url);
   }, []);
 
   const applyAuth = useCallback(async (auth: AuthResponseDto) => {
@@ -48,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshToken: auth.refreshToken,
       accessTokenExpiresAtUtc: auth.accessTokenExpiresAtUtc,
       refreshTokenExpiresAtUtc: auth.refreshTokenExpiresAtUtc,
+      user: auth.user,
     });
     setState({ status: 'signed_in', user: auth.user });
   }, []);
@@ -91,12 +96,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       state,
       apiBaseUrl,
-      setApiBaseUrl: setBaseUrl,
       login,
       register,
       logout,
     }),
-    [state, apiBaseUrl, setBaseUrl, login, register, logout]
+    [state, apiBaseUrl, login, register, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

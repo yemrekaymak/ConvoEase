@@ -8,13 +8,17 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { MistakesScreen } from '../screens/MistakesScreen';
 import { PlacementScreen } from '../screens/PlacementScreen';
+import { PronunciationPracticeScreen } from '../screens/PronunciationPracticeScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { ScenarioGroupScreen } from '../screens/ScenarioGroupScreen';
+import { ScenarioDictionaryScreen } from '../screens/ScenarioDictionaryScreen';
+import { SentenceBuilderScreen } from '../screens/SentenceBuilderScreen';
 import { SummaryScreen } from '../screens/SummaryScreen';
+import { WordMatchingScreen } from '../screens/WordMatchingScreen';
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../types/navigation';
 
-enableScreens(false);
+enableScreens(true);
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -54,6 +58,10 @@ export function RootNavigator() {
         <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="Summary" component={SummaryScreen} />
         <Stack.Screen name="Mistakes" component={MistakesScreen} />
+        <Stack.Screen name="ScenarioDictionary" component={ScenarioDictionaryScreen} />
+        <Stack.Screen name="SentenceBuilder" component={SentenceBuilderScreen} />
+        <Stack.Screen name="WordMatching" component={WordMatchingScreen} />
+        <Stack.Screen name="PronunciationPractice" component={PronunciationPracticeScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

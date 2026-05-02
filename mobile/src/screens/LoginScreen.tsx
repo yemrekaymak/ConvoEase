@@ -18,7 +18,7 @@ import type { RootStackParamList } from '../types/navigation';
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export function LoginScreen({ navigation }: Props) {
-  const { login } = useAuth();
+  const { apiBaseUrl, login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -39,6 +39,9 @@ export function LoginScreen({ navigation }: Props) {
             <Text style={styles.logo}>ConvoEase</Text>
           </Pressable>
           <Text style={styles.tagline}>Hesabin varsa giris yap.</Text>
+          <Text style={styles.serverInfo}>
+            {apiBaseUrl ? `Baglanti adresi: ${apiBaseUrl}` : 'Baglanti adresi algilaniyor...'}
+          </Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <TextInput
@@ -111,7 +114,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textSecondary,
     lineHeight: 22,
-    marginBottom: 32,
+    marginBottom: 10,
+  },
+  serverInfo: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 22,
   },
   input: {
     backgroundColor: colors.surface,

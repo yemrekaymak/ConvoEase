@@ -1,3 +1,5 @@
+import type { MistakeDto } from '../api/types';
+
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
@@ -20,6 +22,38 @@ export type RootStackParamList = {
     interactionLabel: string;
     score?: number | null;
     summaryReport?: string | null;
+    mistakeCount?: number;
+    mistakes?: MistakeDto[];
   };
   Mistakes: undefined;
+  ScenarioDictionary: {
+    scenarioId: number;
+    scenarioTitle: string;
+    promptKey: string;
+    difficultyLevel: 1 | 2 | 3;
+    difficultyLabel: string;
+  };
+  SentenceBuilder: {
+    scenarioId: number;
+    scenarioTitle: string;
+    promptKey: string;
+    difficultyLevel: 1 | 2 | 3;
+    difficultyLabel: string;
+  };
+  WordMatching: {
+    scenarioId: number;
+    scenarioTitle: string;
+    promptKey: string;
+    difficultyLevel: 1 | 2 | 3;
+    difficultyLabel: string;
+  };
+  PronunciationPractice: {
+    scenarioId: number;
+    scenarioTitle: string;
+    promptKey: string;
+    difficultyLevel: 1 | 2 | 3;
+    difficultyLabel: string;
+    sentence: string;
+    translation: string;
+  };
 };

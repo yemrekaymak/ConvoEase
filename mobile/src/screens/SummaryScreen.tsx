@@ -8,7 +8,7 @@ import type { RootStackParamList } from '../types/navigation';
 type Props = NativeStackScreenProps<RootStackParamList, 'Summary'>;
 
 export function SummaryScreen({ navigation, route }: Props) {
-  const { scenarioTitle, difficultyLabel, interactionLabel, score, summaryReport } = route.params;
+  const { scenarioTitle, difficultyLabel, interactionLabel, score, summaryReport, mistakeCount, mistakes } = route.params;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -29,10 +29,35 @@ export function SummaryScreen({ navigation, route }: Props) {
           <Text style={styles.score}>{score == null ? '-' : `${score} / 100`}</Text>
         </View>
 
+        <View style={styles.statsRow}>
+          <View style={[styles.card, styles.statCard]}>
+            <Text style={styles.cardLabel}>Duzeltme</Text>
+            <Text style={styles.statValue}>{mistakeCount ?? 0}</Text>
+          </View>
+          <View style={[styles.card, styles.statCard]}>
+            <Text style={styles.cardLabel}>Durum</Text>
+            <Text style={styles.statValue}>Tamamlandi</Text>
+          </View>
+        </View>
+
         {summaryReport ? (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Rapor</Text>
             <Text style={styles.body}>{summaryReport}</Text>
+          </View>
+        ) : null}
+
+        {mistakes?.length ? (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Hatalar</Text>
+            {mistakes.map((mistake) => (
+              <View key={mistake.id} style={styles.mistakeItem}>
+                <Text style={styles.mistakeWrong}>{mistake.wrongSentence}</Text>
+                <Text style={styles.mistakeArrow}>{'->'} {mistake.correctionText}</Text>
+                {mistake.teachingTip ? <Text style={styles.mistakeTip}>{mistake.teachingTip}</Text> : null}
+                {mistake.whyWrong && !mistake.teachingTip ? <Text style={styles.mistakeTip}>{mistake.whyWrong}</Text> : null}
+              </View>
+            ))}
           </View>
         ) : null}
 
@@ -60,6 +85,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 14 },
+  statCard: { flex: 1, marginBottom: 0 },
   cardLabel: {
     fontSize: 12,
     fontWeight: '700',
@@ -69,5 +96,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   score: { fontSize: 36, fontWeight: '800', color: colors.primary },
+  statValue: { fontSize: 22, fontWeight: '800', color: colors.text },
   body: { fontSize: 15, color: colors.text, lineHeight: 22 },
+  mistakeItem: {
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  mistakeWrong: { fontSize: 14, fontWeight: '700', color: '#9B1C1C' },
+  mistakeArrow: { fontSize: 14, color: colors.text, marginTop: 4 },
+  mistakeTip: { fontSize: 13, color: colors.textSecondary, marginTop: 4, lineHeight: 19 },
 });

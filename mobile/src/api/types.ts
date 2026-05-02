@@ -156,6 +156,11 @@ export type ConversationMessageResponseDto = {
   feedback: ConversationFeedbackDto;
 };
 
+export type ConversationTranscriptResponseDto = {
+  sessionId: string;
+  transcript: string;
+};
+
 export type SessionDto = {
   id: string;
   scenarioId: number;
@@ -176,6 +181,8 @@ export type MistakeDto = {
   errorType: string;
   wrongSentence: string;
   correctionText: string;
+  whyWrong?: string | null;
+  teachingTip?: string | null;
 };
 
 export type SessionReportDto = {

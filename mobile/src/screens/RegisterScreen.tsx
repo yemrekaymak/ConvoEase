@@ -17,7 +17,7 @@ import type { RootStackParamList } from '../types/navigation';
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
 export function RegisterScreen({ navigation }: Props) {
-  const { register } = useAuth();
+  const { apiBaseUrl, register } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -37,6 +37,9 @@ export function RegisterScreen({ navigation }: Props) {
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
         >
           <Text style={styles.logo}>Kayit</Text>
+          <Text style={styles.serverInfo}>
+            {apiBaseUrl ? `Baglanti adresi: ${apiBaseUrl}` : 'Baglanti adresi algilaniyor...'}
+          </Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <TextInput
@@ -78,13 +81,16 @@ export function RegisterScreen({ navigation }: Props) {
               setBusy(true);
               setError(null);
               try {
-                await register({
+                const user = await register({
                   firstName: firstName.trim(),
                   lastName: lastName.trim(),
                   email: email.trim(),
                   password,
                 });
-                navigation.reset({ index: 0, routes: [{ name: 'Placement' }] });
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: user.currentLevel ? 'Home' : 'Placement' }],
+                });
               } catch (e: any) {
                 setError(e?.message ?? 'Kayit basarisiz');
               } finally {
@@ -117,6 +123,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: { fontSize: 28, fontWeight: '800', color: colors.text, marginBottom: 8 },
+  serverInfo: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 22,
+  },
   input: {
     backgroundColor: colors.surface,
     borderRadius: 12,

@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import type { UserSummaryDto } from '../api/types';
 
 const TOKEN_KEY = 'convoease.tokens.v1';
 const SETTINGS_KEY = 'convoease.settings.v1';
@@ -8,6 +9,7 @@ export type StoredTokens = {
   refreshToken: string;
   accessTokenExpiresAtUtc: string;
   refreshTokenExpiresAtUtc: string;
+  user?: UserSummaryDto;
 };
 
 export type StoredSettings = {
