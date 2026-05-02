@@ -3,16 +3,21 @@ import json
 from pathlib import Path
 from groq_baglanti import ai_yanit_al
 
+# --- YENİ EKLENEN KONTROL FONKSİYONU ---
+def _turkce_mi(metin: str) -> bool:
+    """Metnin Turkce (Latin alfabe) oldugunu kontrol eder. Arapca, Cince ve Kiril karakterleri yakalar."""
+    # Arapca, Cince, Kiril ve benzeri alfabeleri kontrol eden regex
+    yabanci_karakter = re.search(r'[\u0600-\u06FF\u4E00-\u9FFF\u0400-\u04FF\u0750-\u077F\u08A0-\u08FF]', metin)
+    return yabanci_karakter is None
+# --------------------------------------
+
 PROMPTLAR = Path(__file__).parent.parent / "promptlar"
 
 # model gecerli puan araligi
 MIN_PUAN = 0
 MAX_PUAN = 100
 
-
 def _json_ayikla(metin: str) -> dict | None:
-    # model bazen json oncesi/sonrasi aciklama metni ekliyor
-    # once markdown kod blogu icinden json cikarmaya calis
     kod_blok = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", metin, re.DOTALL)
     if kod_blok:
         try:
@@ -20,13 +25,11 @@ def _json_ayikla(metin: str) -> dict | None:
         except json.JSONDecodeError:
             pass
 
-    # direkt json parse dene
     try:
         return json.loads(metin)
     except json.JSONDecodeError:
         pass
 
-    # metin icinde ilk { ... } blogu bul
     ilk_ac = metin.find("{")
     son_kapat = metin.rfind("}")
     if ilk_ac != -1 and son_kapat != -1 and son_kapat > ilk_ac:
@@ -37,9 +40,7 @@ def _json_ayikla(metin: str) -> dict | None:
 
     return None
 
-
 def _sonucu_dogrula(veri: dict, tur_no: int) -> dict:
-    # zorunlu alanlarin varligini ve degerlerinin gecerliligi kontrol et
     puan = veri.get("puan", 0)
     if not isinstance(puan, (int, float)):
         puan = 0
@@ -68,8 +69,11 @@ def _sonucu_dogrula(veri: dict, tur_no: int) -> dict:
         })
 
     tesvik = veri.get("tesvik", "Devam et, iyi gidiyorsun.")
-    if not isinstance(tesvik, str) or not tesvik.strip():
+    
+    # --- BURASI GÜNCELLENDİ: Hem boşluk hem de yabancı karakter kontrolü ---
+    if not isinstance(tesvik, str) or not tesvik.strip() or not _turkce_mi(tesvik):
         tesvik = "Devam et, iyi gidiyorsun."
+    # -----------------------------------------------------------------------
 
     return {
         "tur": tur_no,
@@ -79,7 +83,6 @@ def _sonucu_dogrula(veri: dict, tur_no: int) -> dict:
         "tesvik": tesvik
     }
 
-
 def _varsayilan_sonuc(tur_no: int) -> dict:
     return {
         "tur": tur_no,
@@ -88,7 +91,6 @@ def _varsayilan_sonuc(tur_no: int) -> dict:
         "hatalar": [],
         "tesvik": "Devam et, iyi gidiyorsun."
     }
-
 
 class Degerlendirici:
 
@@ -181,8 +183,9 @@ class Degerlendirici:
         seviye: str,
         senaryo: str
     ) -> str:
+        # Not: Klasör isminin 'promptlar' olduğundan emin ol (yukarıdaki PROMPTLAR ile uyumlu)
         sistem_promptu = (
-            Path(__file__).parent.parent / "prompts" / "writing_mode.txt"
+            PROMPTLAR / "writing_mode.txt"
         ).read_text(encoding="utf-8").format(
             user_level=seviye,
             scenario=senaryo
