@@ -114,7 +114,7 @@ class Degerlendirici:
             yanit = ai_yanit_al(
                 sistem_promptu=sistem_promptu,
                 mesajlar=[{"role": "user", "content": kullanici_mesaji}],
-                max_token=512
+                max_token=320
             )
         except Exception:
             yanit = ""
@@ -191,5 +191,5 @@ class Degerlendirici:
         return ai_yanit_al(
             sistem_promptu=sistem_promptu,
             mesajlar=[{"role": "user", "content": kullanici_mesaji}],
-            max_token=512
+            max_token=220
         )

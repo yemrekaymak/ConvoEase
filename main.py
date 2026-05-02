@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -45,6 +46,7 @@ BACKEND_SEVIYE_ADLARI = {
     2: "Intermediate",
     3: "Advanced",
 }
+SPACE_PATTERN = re.compile(r"\s+")
 
 
 class OturumBaslatIstek(BaseModel):
@@ -96,6 +98,11 @@ def _allowed_scenario_bul(allowed_scenarios: list, slug: str):
         if scenario.slug == slug:
             return scenario
     return None
+
+
+def _transcript_temizle(metin: str) -> str:
+    temiz = SPACE_PATTERN.sub(" ", (metin or "").replace("\r", " ").replace("\n", " ")).strip()
+    return temiz
 
 
 @app.post("/oturum/baslat")
@@ -319,6 +326,12 @@ def backend_mesaj(istek: BackendMesajIstek):
             seviye=oturum.seviye,
             senaryo=oturum.senaryo
         )
+    else:
+        karakter_cevabi = konusma_motoru.yazmaya_cevap_uret(
+            kullanici_mesaji=istek.mesaj,
+            seviye=oturum.seviye,
+            senaryo=oturum.senaryo
+        )
 
     degerlendirme = degerlendirici.anlik_degerlendir(
         kullanici_mesaji=istek.mesaj,
@@ -395,5 +408,13 @@ async def backend_ses_metni(dosya: UploadFile = File(...)):
         transcript = sesi_metne_cevir(dosya.filename, icerik)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    transcript = _transcript_temizle(transcript)
+
+    if not transcript:
+        raise HTTPException(
+            status_code=422,
+            detail="Ses algilanamadi, tekrar konusman gerekiyor."
+        )
 
     return {"transcript": transcript}
